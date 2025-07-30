@@ -1,0 +1,22 @@
+# Core data science and machine learning libraries
+pandas>=1.5.0
+numpy>=1.21.0
+scikit-learn>=1.1.0
+
+# PyTorch for deep learning
+torch>=1.12.0
+torchvision>=0.13.0
+
+# Visualization libraries
+matplotlib>=3.5.0
+seaborn>=0.11.0
+
+# Progress bars and utilities
+tqdm>=4.64.0
+
+# Optional: For better performance and additional features
+# Uncomment if needed:
+# jupyter>=1.0.0
+# ipykernel>=6.0.0
+# plotly>=5.0.0
+# scipy>=1.8.0
