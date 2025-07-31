@@ -441,5 +441,90 @@ plt.ylabel('Actual')
 plt.tight_layout()
 plt.savefig('confusion_matrix.png', dpi=300, bbox_inches='tight')
 
+# Save model and related data for API use
+print("Saving model and preprocessing components...")
+
+# Save static scaler
+import pickle
+with open('static_scaler.pkl', 'wb') as f:
+    pickle.dump(static_scaler, f)
+
+# Save static feature columns (from earlier in the script)
+static_feature_columns = [
+    'Avg min between sent tnx', 'Avg min between received tnx', 
+    'Time Diff between first and last (Mins)', 'Sent tnx', 'Received Tnx',
+    'Number of Created Contracts', 'Unique Received From Addresses', 
+    'Unique Sent To Addresses', 'min value received', 'max value received ',
+    'avg val received', 'min val sent', 'max val sent', 'avg val sent',
+    'min value sent to contract', 'max val sent to contract', 
+    'avg value sent to contract', 'total transactions (including tnx to create contract',
+    'total Ether sent', 'total ether received', 'total ether sent contracts',
+    'total ether balance', 'Total ERC20 tnxs', 'ERC20 total Ether received',
+    'ERC20 total ether sent', 'ERC20 total Ether sent contract',
+    'ERC20 uniq sent addr', 'ERC20 uniq rec addr', 'ERC20 uniq sent addr.1',
+    'ERC20 uniq rec contract addr', 'ERC20 avg time between sent tnx',
+    'ERC20 avg time between rec tnx', 'ERC20 avg time between rec 2 tnx',
+    'ERC20 avg time between contract tnx', 'ERC20 min val rec', 'ERC20 max val rec',
+    'ERC20 avg val rec', 'ERC20 min val sent', 'ERC20 max val sent',
+    'ERC20 avg val sent', 'ERC20 min val sent contract', 'ERC20 max val sent contract',
+    'ERC20 avg val sent contract', 'ERC20 uniq sent token name', 'ERC20 uniq rec token name'
+]
+
+# Save sequence feature columns (from transaction data after preprocessing)
+# Get feature names from the actual processed data
+sequence_feature_names = [f'sequence_feature_{i}' for i in range(model_x_values.shape[2])]
+
+# Save model configuration
+model_config = {
+    'sequence_input_size': 10,
+    'static_input_size': model_static_features_scaled.shape[1],
+    'hidden_size': 128,
+    'num_layers': 4,
+    'fc_hidden_sizes': [256, 128],
+    'num_classes': 2,
+    'dropout_rate': 0.3,
+    'sequence_length': 50
+}
+
+# Save everything to files
+with open('static_feature_columns.pkl', 'wb') as f:
+    pickle.dump(static_feature_columns, f)
+
+with open('sequence_feature_names.pkl', 'wb') as f:
+    pickle.dump(sequence_feature_names, f)
+
+with open('model_config.pkl', 'wb') as f:
+    pickle.dump(model_config, f)
+
 #saving model
 torch.save(model.state_dict(), 'fraud_classifier.pth')
+
+print("Saved:")
+print("- fraud_classifier.pth (model state dict)")
+print("- static_scaler.pkl (StandardScaler for static features)")
+print("- static_feature_columns.pkl (list of static feature names)")
+print("- sequence_feature_names.pkl (list of sequence feature names)")
+print("- model_config.pkl (model configuration)")
+
+# Copy files to backend API directory
+import shutil
+import os
+
+backend_model_dir = 'backendApi/model'
+os.makedirs(backend_model_dir, exist_ok=True)
+
+# Copy model files to backend
+files_to_copy = [
+    'fraud_classifier.pth',
+    'static_scaler.pkl', 
+    'static_feature_columns.pkl',
+    'sequence_feature_names.pkl',
+    'model_config.pkl'
+]
+
+for file in files_to_copy:
+    if os.path.exists(file):
+        shutil.copy(file, os.path.join(backend_model_dir, file))
+        print(f"Copied {file} to {backend_model_dir}")
+
+print("Model and preprocessing components ready for API use!")
