@@ -230,8 +230,8 @@
   }
   
   .cosmic-button {
-    @apply bg-gradient-to-r from-primary to-secondary text-primary-foreground;
-    @apply hover:shadow-glow transition-all duration-300;
+    @apply bg-gradient-to-r from-primary to-accent text-primary-foreground;
+    @apply hover:shadow-glow transition-all duration-300 ease-in-out;
   }
   
   .space-gradient {
