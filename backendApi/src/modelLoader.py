@@ -433,20 +433,11 @@ class FraudDetectionModel:
     def analyze_address_from_etherscan(self, address, max_transactions=100):
        
         print(f"Analyzing address: {address}")
-        print("Fetching transaction data from Etherscan...")
         
         try:
             # Fetch different types of transactions
             print("  - Fetching normal transactions...")
             normal_txs = self.etherscan.get_transactions(address, offset=max_transactions)
-            
-            print("  - Fetching internal transactions...")
-            internal_txs = self.etherscan.get_internal_transactions(address, offset=max_transactions)
-            
-            print("  - Fetching ERC20 transfers...")
-            erc20_txs = self.etherscan.get_erc20_transfers(address, offset=max_transactions)
-            
-            print(f"✓ Fetched {len(normal_txs)} normal, {len(internal_txs)} internal, {len(erc20_txs)} ERC20 transactions")
             
             # Extract static features
             print("Extracting features...")
@@ -461,13 +452,13 @@ class FraudDetectionModel:
             result = self._predict_with_sequence(static_features, transaction_sequence)
             
             # Add transaction summary
-            result['transaction_summary'] = {
-                'total_transactions': len(normal_txs) + len(internal_txs) + len(erc20_txs),
-                'address': address,
-                'analysis_timestamp': datetime.datetime.now().isoformat()
-            }
+            result['total_transactions'] = len(normal_txs)
+            result['timestamp'] = datetime.datetime.now().isoformat()
             
-            return result
+            return {
+                "result":result,
+                "transactionsUsed":normal_txs
+            }
             
         except Exception as e:
             print(f"Error analyzing address: {e}")

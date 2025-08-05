@@ -28,7 +28,7 @@ if not ETHERSCAN_API_KEY:
     raise ValueError("ETHERSCAN_API_KEY environment variable is not set")
 
 
-@app.post("/api/processAdresse")
+@app.post("/api/processAdress")
 async def process_addresses(address: str):
    
     try:
@@ -39,7 +39,8 @@ async def process_addresses(address: str):
             )
             return {
                 "address": address,
-                "prediction": prediction
+                "prediction": prediction["result"],
+                "transactions_used": prediction["transactionsUsed"],
             }
     except requests.RequestException as e:
         raise HTTPException(status_code=500, detail=f"Request error: {str(e)}")

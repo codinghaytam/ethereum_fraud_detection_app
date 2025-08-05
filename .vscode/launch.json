@@ -1,0 +1,17 @@
+{
+    "configurations": [
+        {
+            "name": "Python Debugger: FastAPI",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": [
+                "backendApi.src.app:app",
+                "--reload",
+                   "--port",
+                "8001"
+            ],
+            "jinja": true
+        }
+    ]
+}
