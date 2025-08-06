@@ -42,6 +42,11 @@ jobs:
         echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+    - name: Prepare deployment package
+      run: |
+        mkdir -p /tmp/deploy
+        cp -r ./app ./docker-compose.yml /tmp/deploy/
+        tar -czf deployment_package.tar.gz -C /tmp/deploy .
 
     - name: Create deployment package
       run: |
