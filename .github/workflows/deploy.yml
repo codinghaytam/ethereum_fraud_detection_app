@@ -62,6 +62,8 @@ jobs:
             --exclude='*.png' \
             --exclude='*.pth' \
             --exclude='*.npy' \
+            --exclude='deployment.tar.gz' \
+            --warning=no-file-changed \
             -czf deployment.tar.gz .
         echo "Deployment package created (Docker Compose approach)"
 
