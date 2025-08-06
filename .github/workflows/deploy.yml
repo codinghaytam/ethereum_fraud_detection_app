@@ -47,6 +47,10 @@ jobs:
     - name: Create deployment package
       run: |
         # Create optimized deployment package - only include necessary files for Docker Compose
+        # Remove existing deployment package if it exists
+        rm -f deployment.tar.gz
+        
+        # Create tar with error handling
         tar --exclude='.git' \
             --exclude='node_modules' \
             --exclude='.github' \
@@ -63,9 +67,37 @@ jobs:
             --exclude='*.pth' \
             --exclude='*.npy' \
             --exclude='deployment.tar.gz' \
-            --warning=no-file-changed \
-            -czf deployment.tar.gz .
-        echo "Deployment package created (Docker Compose approach)"
+            -czf deployment.tar.gz . || { 
+              # If tar fails due to file changes, try without strict error checking
+              echo "Retrying tar creation with less strict checking..."
+              tar --exclude='.git' \
+                  --exclude='node_modules' \
+                  --exclude='.github' \
+                  --exclude='*.log' \
+                  --exclude='cosmoscan-eth-main/node_modules' \
+                  --exclude='cosmoscan-eth-main/dist' \
+                  --exclude='backend/target' \
+                  --exclude='backendApi/__pycache__' \
+                  --exclude='backendApi/apiEnv' \
+                  --exclude='training-env' \
+                  --exclude='**/.DS_Store' \
+                  --exclude='**/npm-debug.log*' \
+                  --exclude='*.png' \
+                  --exclude='*.pth' \
+                  --exclude='*.npy' \
+                  --exclude='deployment.tar.gz' \
+                  --ignore-failed-read \
+                  -czf deployment.tar.gz . 2>/dev/null || true
+            }
+        
+        # Verify the tar file was created
+        if [ -f deployment.tar.gz ]; then
+          echo "Deployment package created (Docker Compose approach)"
+          ls -lh deployment.tar.gz
+        else
+          echo "Failed to create deployment package"
+          exit 1
+        fi
 
     - name: Copy files to EC2
       run: |
