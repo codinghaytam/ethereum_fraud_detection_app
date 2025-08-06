@@ -1,7 +1,15 @@
+# Data folder - exclude entirely from deployment
+data/
 data
+*/data/
+**/data/
+
+# Environment files
 backendApi/src/.env
 backend/src/main/resources/application.properties
 .env
+**/.env
+
 
 # Backend Java/Spring Boot ignores
 HELP.md
