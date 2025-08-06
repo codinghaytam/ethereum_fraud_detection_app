@@ -5,35 +5,17 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import CircularProgressDemo from '@/components/PercentageDisplay'; // Adjust the import based on your CircularProgress component
 
-interface ScanResult {
-  address: string;
-  fraudScore: number;
-  confidence: number;
-  status: 'safe' | 'suspicious' | 'fraudulent' | 'unknown';
-  timestamp: Date;
-}
-
+import { getAddressPrediction } from '@/lib/utils'; // Adjust the import based on your API utility
+import { AddressPredictionResponse} from '@/lib/types'; // Adjust the import based on your types
 export default function AddressScanner() {
   const [address, setAddress] = useState('');
   const [isScanning, setIsScanning] = useState(false);
-  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  const [scanResult, setScanResult] = useState< AddressPredictionResponse| null>(null);
   const [error, setError] = useState('');
-  const [recentScans] = useState<ScanResult[]>([
-    {
-      address: '0x742d35Cc6523C0532925a3b8D45C14394667e6ad',
-      fraudScore: 15,
-      confidence: 92,
-      status: 'safe',
-      timestamp: new Date(Date.now() - 1000 * 60 * 5)
-    },
-    {
-      address: '0x1234567890123456789012345678901234567890',
-      fraudScore: 85,
-      confidence: 88,
-      status: 'fraudulent',
-      timestamp: new Date(Date.now() - 1000 * 60 * 15)
-    }
+  const [recentScans] = useState<AddressPredictionResponse[]>([
+    
   ]);
 
   const isValidEthereumAddress = (addr: string) => {
@@ -58,28 +40,27 @@ export default function AddressScanner() {
     }
 
     setIsScanning(true);
-
-    // Simulate API call
-    setTimeout(() => {
-      const mockResult: ScanResult = {
-        address,
-        fraudScore: Math.floor(Math.random() * 100),
-        confidence: 75 + Math.floor(Math.random() * 25),
-        status: Math.random() > 0.7 ? 'fraudulent' : Math.random() > 0.5 ? 'suspicious' : 'safe',
-        timestamp: new Date()
-      };
-      
-      setScanResult(mockResult);
+    try{
+      const reponse = await getAddressPrediction(address);
+      setScanResult(
+        reponse
+      )
       setIsScanning(false);
-    }, 3000);
-  };
+  }catch (err) {
+      setError('Failed to fetch prediction. Please try again later.');
+      setIsScanning(false);
+    }
+    
+};
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'safe': return 'status-safe';
-      case 'suspicious': return 'status-warning';
-      case 'fraudulent': return 'status-danger';
-      default: return 'status-unknown';
+
+
+
+  const getStatusColor = (prediction: string) => {
+    switch (prediction.toLowerCase()) {
+      case 'normal': return 'bg-green-500 hover:bg-green-600 text-white';
+      case 'fraud': return 'bg-red-500 hover:bg-red-600 text-white';
+      default: return 'bg-gray-500 hover:bg-gray-600 text-white';
     }
   };
 
@@ -164,8 +145,8 @@ export default function AddressScanner() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-space font-bold">Analysis Result</h3>
-              <Badge className={getStatusColor(scanResult.status)}>
-                {scanResult.status.toUpperCase()}
+              <Badge className={getStatusColor(scanResult.prediction)}>
+                {scanResult.prediction.toUpperCase()}
               </Badge>
             </div>
 
@@ -177,15 +158,40 @@ export default function AddressScanner() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Fraud Score</label>
-                <div className="text-3xl font-bold text-primary">{scanResult.fraudScore}/100</div>
+              <div className="text-center">
+                <h4 className="text-sm font-medium mb-2 text-muted-foreground">Fraud Probability</h4>
+                <CircularProgressDemo value={scanResult.fraud_probability*100} />
               </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">AI Confidence</label>
-                <div className="text-3xl font-bold text-secondary">{scanResult.confidence}%</div>
+              <div className="text-center">
+                <h4 className="text-sm font-medium mb-2 text-muted-foreground">Confidence</h4>
+                <CircularProgressDemo value={scanResult.confidence*100}  />
               </div>
             </div>
+
+            {/* Fraud Explanations - only show if address is fraudulent */}
+            {scanResult.is_fraud && scanResult.explanations && scanResult.explanations.length > 0 && (
+              <div className="space-y-4">
+                <h4 className="text-lg font-semibold text-red-600">⚠️ Fraud Indicators</h4>
+                <div className="space-y-4">
+                  {scanResult.explanations.map((explanation, index) => (
+                    <div key={index} className="p-4 border border-red-200 bg-red-50 rounded-lg">
+                      <h5 className="font-semibold text-red-800 mb-2">{explanation.title}</h5>
+                      <p className="text-red-700 text-sm mb-3">{explanation.description}</p>
+                      {explanation.examples && explanation.examples.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="font-medium text-red-800 text-sm">Common examples:</p>
+                          <ul className="list-disc list-inside space-y-1 text-red-600 text-sm">
+                            {explanation.examples.map((example, exampleIndex) => (
+                              <li key={exampleIndex}>{example}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </Card>
       )}
@@ -198,15 +204,15 @@ export default function AddressScanner() {
             {recentScans.map((scan, index) => (
               <div key={index} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                 <div className="flex items-center space-x-3">
-                  <Badge className={getStatusColor(scan.status)}>
-                    {scan.status}
+                  <Badge className={getStatusColor(scan.prediction)}>
+                    {scan.prediction.toUpperCase()}
                   </Badge>
                   <span className="font-mono text-sm">{truncateAddress(scan.address)}</span>
                 </div>
-                <div className="flex items-center text-xs text-muted-foreground">
+                {/* <div className="flex items-center text-xs text-muted-foreground">
                   <Clock className="h-3 w-3 mr-1" />
-                  {Math.floor((Date.now() - scan.timestamp.getTime()) / 1000 / 60)}m ago
-                </div>
+                  {Math.floor((Date.now() - scan..getTime()) / 1000 / 60)}m ago
+                </div> */}
               </div>
             ))}
           </div>

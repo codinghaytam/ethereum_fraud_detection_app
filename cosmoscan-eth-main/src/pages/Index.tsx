@@ -11,9 +11,9 @@ const Index = () => {
     <div className=" bg-background">
       <NavigationHeader />
       <main className="relative z-10">
-        <div className="absolute inset-0">
+        {/* <div className="absolute inset-0">
         <DarkVeil />
-        </div>
+        </div> */}
         {/* Hero section */}
         <HeroSection />
         
