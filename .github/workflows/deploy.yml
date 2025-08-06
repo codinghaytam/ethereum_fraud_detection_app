@@ -44,7 +44,27 @@ jobs:
         ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
 
-  
+    - name: Create deployment package
+      run: |
+        # Create optimized deployment package - only include necessary files for Docker Compose
+        tar --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='.github' \
+            --exclude='*.log' \
+            --exclude='cosmoscan-eth-main/node_modules' \
+            --exclude='cosmoscan-eth-main/dist' \
+            --exclude='backend/target' \
+            --exclude='backendApi/__pycache__' \
+            --exclude='backendApi/apiEnv' \
+            --exclude='training-env' \
+            --exclude='**/.DS_Store' \
+            --exclude='**/npm-debug.log*' \
+            --exclude='*.png' \
+            --exclude='*.pth' \
+            --exclude='*.npy' \
+            -czf deployment.tar.gz .
+        echo "Deployment package created (Docker Compose approach)"
+
     - name: Copy files to EC2
       run: |
         scp -i ~/.ssh/id_rsa deployment.tar.gz ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/
