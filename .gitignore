@@ -37,3 +37,31 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Docker and deployment
+deployment.tar.gz
+docker-compose.override.yml
+
+# Python cache and environments
+__pycache__/
+*.py[cod]
+*$py.class
+training-env/
+apiEnv/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+dist/
+build/
+
+# Machine Learning models and data
+*.pkl
+*.npy
+confusion_matrix.png
+image.png
+processed_*.npy
+
+# Logs
+*.log
