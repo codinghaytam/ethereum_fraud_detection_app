@@ -39,9 +39,26 @@ jobs:
     - name: Setup SSH
       run: |
         mkdir -p ~/.ssh
-        echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+        chmod 700 ~/.ssh
+        
+        # Write SSH key with proper formatting
+        echo "${{ secrets.EC2_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
+        
+        # Set correct permissions
         chmod 600 ~/.ssh/id_rsa
+        
+        # Verify key format
+        if ! ssh-keygen -l -f ~/.ssh/id_rsa > /dev/null 2>&1; then
+          echo "SSH key format verification failed"
+          exit 1
+        fi
+        
+        # Add host to known_hosts
         ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+        chmod 644 ~/.ssh/known_hosts
+        
+        # Test SSH connection
+        ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo 'SSH connection successful'"
 
 
     - name: Create deployment package
@@ -101,7 +118,13 @@ jobs:
 
     - name: Copy files to EC2
       run: |
-        scp -i ~/.ssh/id_rsa deployment.tar.gz ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/
+        # Copy deployment package to EC2 with retry logic
+        scp -o ConnectTimeout=30 -o StrictHostKeyChecking=no -o UserKnownHostsFile=~/.ssh/known_hosts -i ~/.ssh/id_rsa deployment.tar.gz ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/ || {
+          echo "First SCP attempt failed, retrying in 5 seconds..."
+          sleep 5
+          scp -o ConnectTimeout=30 -o StrictHostKeyChecking=no -o UserKnownHostsFile=~/.ssh/known_hosts -i ~/.ssh/id_rsa deployment.tar.gz ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/
+        }
+        echo "Deployment package copied to EC2 successfully"
 
     - name: Deploy on EC2
       run: |
