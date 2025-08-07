@@ -4,13 +4,11 @@ import com.example.demo.dto.PredictionResponceDTO;
 import com.example.demo.services.ExplanationService;
 import com.example.demo.services.PredictionService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api")
+@CrossOrigin(origins = "*")
 public class AccountAnalyserController {
     private final ExplanationService explanationService;
     private final PredictionService predictionService;

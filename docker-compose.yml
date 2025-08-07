@@ -31,8 +31,14 @@ services:
       - "${BACKEND_PORT:-8080}:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
+      - MISTRAL_AI_API_KEY=${MISTRAL_AI_API_KEY}
+      - ETHERSCAN_API_KEY=${ETHERSCAN_API_KEY}
+    env_file:
+      - .env
     networks:
       - ethereum-fraud-detection
+    depends_on:
+      - fastapi
     restart: unless-stopped
 
   # FastAPI ML Service

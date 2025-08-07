@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+apiEnv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Model files (these are mounted as volumes)
+*.pth
+*.pkl
+*.npy
+
+# Data files
+data/
+*.csv
+*.json
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md

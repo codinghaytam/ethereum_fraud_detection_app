@@ -1,20 +1,23 @@
 from fastapi import FastAPI, HTTPException
-import requests
 import os
-from dotenv import load_dotenv
 import sys
+from datetime import datetime
 from dotenv import load_dotenv
+
+# Import scientific libraries first to avoid conflicts
+import numpy as np
+import pandas as pd
+import torch
+
+# Load environment variables early
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../.env'))
+
 # Add the parent directory to Python path to find modelLoader
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
+
+# Import after setting up environment and path
+import requests
 from modelLoader import predict_address_state
-import pandas as pd
-import numpy as np
-import torch
-from datetime import datetime
-
-
-# Load environment variables from .env file
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../.env'))
 
 # Load model using the new generic approach
 
@@ -35,7 +38,7 @@ async def process_addresses(address: str):
             prediction = predict_address_state(
                 address=address, 
                 apikey=ETHERSCAN_API_KEY, 
-                modelDir='../model/'
+                modelDir='model/'
             )
             return {
                 "address": address,

@@ -179,6 +179,18 @@ jobs:
         server.port=8080
         server.servlet.context-path=/
         
+        # Mistral AI Configuration
+        spring.ai.mistralai.api-key=${{ secrets.MISTRAL_AI_API_KEY }}
+        spring.ai.mistralai.chat.options.model=mistral-large-latest
+        spring.ai.mistralai.chat.options.temperature=0.7
+        spring.ai.mistralai.chat.options.max-tokens=1000
+        
+        # Etherscan API Configuration
+        etherscan.key=${{ secrets.ETHERSCAN_API_KEY }}
+        
+        # Prediction API Configuration (FastAPI service)
+        prediction.api.uri=http://fastapi:8000/api/processAdress
+        
         # CORS configuration
         app.cors.allowed-origins=http://${{ secrets.EC2_HOST }}:3000,http://localhost:3000
         app.cors.allowed-methods=GET,POST,PUT,DELETE,OPTIONS
@@ -188,6 +200,7 @@ jobs:
         # Logging
         logging.level.com.example.demo=INFO
         logging.level.org.springframework=INFO
+        logging.level.org.springframework.ai=DEBUG
         
         # FastAPI service URL
         app.fastapi.url=http://fastapi:8000
@@ -206,6 +219,10 @@ jobs:
         
         # Spring profiles
         SPRING_PROFILES_ACTIVE=docker
+        
+        # API Keys (these will be passed from environment variables)
+        ETHERSCAN_API_KEY=${{ secrets.ETHERSCAN_API_KEY }}
+        MISTRAL_AI_API_KEY=${{ secrets.MISTRAL_AI_API_KEY }}
         
         # Model directory
         MODEL_DIR=/app/model

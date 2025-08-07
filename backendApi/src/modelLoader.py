@@ -1,15 +1,41 @@
-import torch
-import torch.nn as nn
-import numpy as np
-import pandas as pd
-import pickle
-from sklearn.preprocessing import StandardScaler
-from torch.utils.data import Dataset, DataLoader
 import warnings
-import requests
-import time
 import json
 import datetime
+import time
+import requests
+import pickle
+
+# Import core libraries with error handling
+try:
+    import numpy as np
+    print("✓ NumPy loaded successfully")
+except ImportError as e:
+    print(f"✗ Error importing NumPy: {e}")
+    raise
+
+try:
+    import pandas as pd
+    print("✓ Pandas loaded successfully") 
+except ImportError as e:
+    print(f"✗ Error importing Pandas: {e}")
+    raise
+
+try:
+    import torch
+    import torch.nn as nn
+    print("✓ PyTorch loaded successfully")
+except ImportError as e:
+    print(f"✗ Error importing PyTorch: {e}")
+    raise
+
+try:
+    from sklearn.preprocessing import StandardScaler
+    from torch.utils.data import Dataset, DataLoader
+    print("✓ ML libraries loaded successfully")
+except ImportError as e:
+    print(f"✗ Error importing ML libraries: {e}")
+    raise
+
 warnings.filterwarnings('ignore')
 
 # Check for CUDA availability and set device
@@ -594,7 +620,7 @@ class FraudDetectionModel:
         
         # Save results if requested
         if save_results and results:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"fraud_analysis_results_{timestamp}.json"
             
             with open(filename, 'w') as f:
