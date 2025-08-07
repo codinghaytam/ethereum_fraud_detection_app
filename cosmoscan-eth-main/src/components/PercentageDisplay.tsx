@@ -54,6 +54,7 @@ const CircularProgress = ({
 
   return (
     <div className="relative">
+      
       <svg
         width={size}
         height={size}

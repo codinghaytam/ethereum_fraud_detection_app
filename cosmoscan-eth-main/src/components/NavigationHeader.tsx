@@ -3,6 +3,16 @@ import { Shield, Search, Info, Code } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function NavigationHeader() {
+  const scrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ 
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }
+  };
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-white/20 bg-black/40 backdrop-blur-md supports-[backdrop-filter]:bg-black/30">
       <div className="container mx-auto px-6 py-4">
@@ -25,11 +35,21 @@ export default function NavigationHeader() {
 
           {/* Navigation */}
           <nav className="hidden md:flex items-center space-x-1">
-            <Button variant="ghost" size="sm" className="font-medium text-gray-200 hover:text-white hover:bg-white/10">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="font-medium text-gray-200 hover:text-white hover:bg-white/10"
+              onClick={() => scrollToSection('scanner')}
+            >
               <Search className="h-4 w-4 mr-2" />
               Scanner
             </Button>
-            <Button variant="ghost" size="sm" className="font-medium text-gray-200 hover:text-white hover:bg-white/10">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="font-medium text-gray-200 hover:text-white hover:bg-white/10"
+              onClick={() => scrollToSection('about')}
+            >
               <Info className="h-4 w-4 mr-2" />
               About
             </Button>
@@ -39,10 +59,6 @@ export default function NavigationHeader() {
             </Button>
           </nav>
 
-          {/* Mobile menu button */}
-          <Button variant="outline" size="sm" className="md:hidden border-white/30 text-gray-200 hover:bg-white/10">
-            <Search className="h-4 w-4" />
-          </Button>
         </div>
       </div>
     </header>

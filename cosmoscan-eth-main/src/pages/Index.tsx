@@ -11,14 +11,16 @@ const Index = () => {
     <div className=" bg-background">
       <NavigationHeader />
       <main className="relative z-10">
-        {/* <div className="absolute inset-0">
+         <div className="absolute inset-0">
         <DarkVeil />
-        </div> */}
+        </div> 
         {/* Hero section */}
-        <HeroSection />
+        <section id="about">
+          <HeroSection />
+        </section>
         
         {/* Scanner section */}
-        <section className="py-12">
+        <section id="scanner" className="py-12">
           <div className="container mx-auto px-6">
             <AddressScanner />
           </div>
