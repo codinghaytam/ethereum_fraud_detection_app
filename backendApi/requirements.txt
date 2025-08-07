@@ -5,10 +5,8 @@ python-dotenv==1.0.0
 requests==2.31.0
 pydantic==2.5.0
 
-# ML/Data processing - Use compatible versions
+# Core ML/Data processing (PyTorch installed separately in Dockerfile)
 numpy==1.24.4
-torch==2.1.0
-torchvision==0.16.0
 pandas==2.0.3
 scikit-learn==1.3.2
 
