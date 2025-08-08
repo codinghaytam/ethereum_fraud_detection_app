@@ -9,7 +9,7 @@ export function cn(...inputs: ClassValue[]) {
 
 // API function to get address prediction
 export async function getAddressPrediction(address: string): Promise<AddressPredictionResponse> {
-  const response = await fetch('http://localhost:8080/api/analyse?address='+address, {
+  const response = await fetch('http://backend:8080/api/analyse?address='+address, {
     method: 'POST',
     
   });
