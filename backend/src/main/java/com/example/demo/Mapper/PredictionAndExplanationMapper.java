@@ -19,5 +19,6 @@ public interface PredictionAndExplanationMapper {
     @Mapping(source = "predictionResponseDTO.prediction.confidence", target = "confidence")
     @Mapping(source = "predictionResponseDTO.prediction.total_transactions", target = "total_transactions")
     @Mapping(source = "predictionResponseDTO.prediction.timestamp", target = "analysis_timestamp")
+    @Mapping(source = "predictionResponseDTO.prediction.fraud_probability", target = "fraud_probability")
     PredictionAndExplanationDTO toPredictionAndExplanationDTO(PredictionResponceDTO predictionResponseDTO, List<Raison> explanations);
 }

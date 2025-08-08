@@ -14,6 +14,7 @@ public class PredictionAndExplanationDTO {
     private int total_transactions;
     private String analysis_timestamp;
     private double confidence;
+    private String fraud_probability;
     private List<Raison> explanations;
 
 }

@@ -13,7 +13,9 @@ services:
     ports:
       - "${FRONTEND_PORT:-3000}:80"
     networks:
-      - ethereum-fraud-detection
+      ethereum-fraud-detection:
+        ipv4_address: 172.18.0.3
+
     depends_on:
       - fastapi
       - backend
@@ -36,7 +38,8 @@ services:
     env_file:
       - .env
     networks:
-      - ethereum-fraud-detection
+      ethereum-fraud-detection:
+        ipv4_address: 172.18.0.4
     depends_on:
       - fastapi
     restart: unless-stopped
@@ -59,7 +62,8 @@ services:
     volumes:
       - ./backendApi/model:/app/model:ro
     networks:
-      - ethereum-fraud-detection
+      ethereum-fraud-detection:
+        ipv4_address: 172.18.0.2
     restart: unless-stopped
 
 networks:
