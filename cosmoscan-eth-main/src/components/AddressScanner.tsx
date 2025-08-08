@@ -17,7 +17,7 @@ export default function AddressScanner() {
   const [recentScans] = useState<AddressPredictionResponse[]>([
     
   ]);
-
+  console.log(scanResult)
   const isValidEthereumAddress = (addr: string) => {
     return /^0x[a-fA-F0-9]{40}$/.test(addr);
   };
@@ -147,6 +147,7 @@ export default function AddressScanner() {
               <h3 className="text-xl font-space font-bold">Analysis Result</h3>
               <Badge className={getStatusColor(scanResult.prediction)}>
                 {scanResult.prediction.toUpperCase()}
+                
               </Badge>
             </div>
 
