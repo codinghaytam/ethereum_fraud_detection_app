@@ -45,7 +45,7 @@ jobs:
         # Create optimized deployment package - exclude data folder and sensitive files
         rm -f deployment.tar.gz
         
-        # Create tar excluding data folder and other unnecessary files
+        # Create tar excluding data folder and other unnecessary files, but keeping model files
         tar --exclude='.git' \
             --exclude='node_modules' \
             --exclude='.github' \
@@ -61,7 +61,6 @@ jobs:
             --exclude='**/.DS_Store' \
             --exclude='**/npm-debug.log*' \
             --exclude='*.png' \
-            --exclude='*.pth' \
             --exclude='*.npy' \
             --exclude='deployment.tar.gz' \
             --exclude='.env' \
@@ -83,7 +82,6 @@ jobs:
                   --exclude='**/.DS_Store' \
                   --exclude='**/npm-debug.log*' \
                   --exclude='*.png' \
-                  --exclude='*.pth' \
                   --exclude='*.npy' \
                   --exclude='deployment.tar.gz' \
                   --exclude='.env' \
@@ -96,6 +94,10 @@ jobs:
         if [ -f deployment.tar.gz ]; then
           echo "Deployment package created (excluding data folder)"
           ls -lh deployment.tar.gz
+          
+          # Verify model files are included
+          echo "Verifying model files are included..."
+          tar -tzf deployment.tar.gz | grep -E "backendApi/model/.*\.(pth|pkl)$" || echo "Warning: Model files may not be included"
         else
           echo "Failed to create deployment package"
           exit 1

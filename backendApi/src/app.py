@@ -35,10 +35,18 @@ if not ETHERSCAN_API_KEY:
 async def process_addresses(address: str):
    
     try:
+            # Use absolute path resolution for model directory
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            model_dir = os.path.join(script_dir, '..', 'model')
+            
+            # Fallback to relative path if absolute doesn't work
+            if not os.path.exists(model_dir):
+                model_dir = '../model/'
+            
             prediction = predict_address_state(
                 address=address, 
                 apikey=ETHERSCAN_API_KEY, 
-                modelDir= '../model/'
+                modelDir=model_dir
             )
             return {
                 "address": address,
@@ -53,5 +61,29 @@ async def process_addresses(address: str):
 @app.get("/")
 async def root():
     return {"message": "Ethereum Address Processor API", "status": "running"}
+
+@app.get("/debug/model")
+async def debug_model():
+    """Debug endpoint to check model file availability"""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    model_dir = os.path.join(script_dir, '..', 'model')
+    
+    debug_info = {
+        "script_dir": script_dir,
+        "model_dir_absolute": os.path.abspath(model_dir),
+        "model_dir_exists": os.path.exists(model_dir),
+        "model_files": []
+    }
+    
+    if os.path.exists(model_dir):
+        debug_info["model_files"] = os.listdir(model_dir)
+    else:
+        # Try relative path
+        relative_model_dir = '../model/'
+        debug_info["relative_model_dir_exists"] = os.path.exists(relative_model_dir)
+        if os.path.exists(relative_model_dir):
+            debug_info["relative_model_files"] = os.listdir(relative_model_dir)
+    
+    return debug_info
 
 
