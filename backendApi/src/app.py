@@ -38,7 +38,7 @@ async def process_addresses(address: str):
             prediction = predict_address_state(
                 address=address, 
                 apikey=ETHERSCAN_API_KEY, 
-                modelDir= os.path.abspath(__file__)+'/../model/'
+                modelDir= '../model/'
             )
             return {
                 "address": address,
