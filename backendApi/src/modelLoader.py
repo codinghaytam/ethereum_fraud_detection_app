@@ -423,7 +423,7 @@ class FraudDetectionModel:
                 self.scaler = pickle.load(f)
 
             # Load feature column names
-            with open(f'{self.model_dir}/static_feature_columns.pkl', 'rb') as f:
+            with open(f'{self.model_dir}static_feature_columns.pkl', 'rb') as f:
                 saved_columns = pickle.load(f)
 
             # Use only the features the scaler expects
