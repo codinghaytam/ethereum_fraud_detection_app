@@ -445,7 +445,7 @@ class FraudDetectionModel:
             )
 
             # Load trained weights
-            model_state = torch.load(f'{self.model_dir}/fraud_classifier.pth', map_location='cpu')
+            model_state = torch.load(f'{self.model_dir}fraud_classifier.pth', map_location='cpu')
             self.model.load_state_dict(model_state)
             self.model.to(self.device)
             self.model.eval()
