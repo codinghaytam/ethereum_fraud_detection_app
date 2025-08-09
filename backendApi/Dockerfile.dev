@@ -18,6 +18,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy source code
 COPY . .
 
+COPY model/*.pth /app/model/
+
+
 EXPOSE 8000
 
 # Run FastAPI with uvicorn in development mode

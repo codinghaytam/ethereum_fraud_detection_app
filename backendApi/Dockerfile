@@ -32,6 +32,7 @@ RUN python -c "import numpy; print(f'NumPy: {numpy.__version__}'); import torch;
 COPY . .
 COPY startup.sh /app/startup.sh
 
+COPY model/*.pth /app/model/
 # Make startup script executable
 RUN chmod +x /app/startup.sh
 
@@ -41,9 +42,6 @@ USER appuser
 
 EXPOSE 8000
 
-# Add health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/ || exit 1
 
 # Use startup script instead of direct uvicorn
 CMD ["/app/startup.sh"]
