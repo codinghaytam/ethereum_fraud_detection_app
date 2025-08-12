@@ -476,7 +476,6 @@ def predict_address_fraud(ethereum_address, etherscan_api_key, model_path=DEFAUL
         model.to(device)
         model.eval()
         
-        print("Model loaded successfully!")
         
         # Fetch transaction data from Etherscan
         transaction_df = fetch_etherscan_transactions(ethereum_address, etherscan_api_key)
@@ -485,8 +484,8 @@ def predict_address_fraud(ethereum_address, etherscan_api_key, model_path=DEFAUL
             return {
                 'address': ethereum_address,
                 'prediction': "Fraud",
-                'confidence': 0.99,
-                'fraud_probability': 0.99,
+                'confidence': 1.0,
+                'fraud_probability': 1.0,
                 'total_transactions': 0,
                 'error': "No transactions found for this address"
             }
@@ -498,7 +497,7 @@ def predict_address_fraud(ethereum_address, etherscan_api_key, model_path=DEFAUL
             transaction_df, ethereum_address, max_sequence_length=MAX_SEQUENCE_LENGTH
         )
         
-
+        
         # Preprocess features using saved scalers
         if static_scaler is not None and len(static_feature_cols) > 0:
             # Create DataFrame with expected features, filling missing ones with zeros
