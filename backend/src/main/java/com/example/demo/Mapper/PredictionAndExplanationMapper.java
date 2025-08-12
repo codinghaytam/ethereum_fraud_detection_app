@@ -13,12 +13,10 @@ import java.util.List;
 
 public interface PredictionAndExplanationMapper {
     @Mapping(source = "explanations", target = "explanations")
-    @Mapping(source = "predictionResponseDTO.prediction.prediction", target = "prediction")
-    @Mapping(source = "predictionResponseDTO.prediction.is_fraud", target = "is_fraud")
+    @Mapping(source = "predictionResponseDTO.prediction", target = "prediction")
     @Mapping(source = "predictionResponseDTO.address", target = "address")
-    @Mapping(source = "predictionResponseDTO.prediction.confidence", target = "confidence")
-    @Mapping(source = "predictionResponseDTO.prediction.total_transactions", target = "total_transactions")
-    @Mapping(source = "predictionResponseDTO.prediction.timestamp", target = "analysis_timestamp")
-    @Mapping(source = "predictionResponseDTO.prediction.fraud_probability", target = "fraud_probability")
+    @Mapping(source = "predictionResponseDTO.confidence", target = "confidence")
+    @Mapping(source = "predictionResponseDTO.total_transactions", target = "total_transactions")
+    @Mapping(source = "predictionResponseDTO.fraud_probability", target = "fraud_probability")
     PredictionAndExplanationDTO toPredictionAndExplanationDTO(PredictionResponceDTO predictionResponseDTO, List<Raison> explanations);
 }

@@ -29,7 +29,7 @@ public class ExplanationService {
     }
 
     public PredictionAndExplanationDTO ExplainFraud(PredictionResponceDTO addressPrediction) throws JsonProcessingException {
-        String transactions = addressPrediction.getTransactions_used().toString();
+        String transactions = addressPrediction.getTransactions_used();
         String aiResponce = mistralAiChatModel.call("you are a blockchain expert ,Analyse why the following address is fraudulant: " + addressPrediction.getAddress() + " here are the transactions: " + transactions + "give 3 probable raisons with examples of popular scams including the raison"
         + " the response format:" + raisonBeanOutputConverter.getFormat());
         if (aiResponce == null || aiResponce.isEmpty()) {

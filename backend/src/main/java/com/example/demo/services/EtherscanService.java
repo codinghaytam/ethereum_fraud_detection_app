@@ -24,26 +24,5 @@ public class EtherscanService {
         this.restTemplate = restTemplate;
     }
 
-    public List<EthTransaction> getEthTransactions(String address) throws JsonProcessingException {
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(uriEtherscan)
-                .queryParam("module", "account")
-                .queryParam("action", "txlist")
-                .queryParam("address", address)
-                .queryParam("apikey", etherscanKey)
-                .queryParam("page",1)
-                .queryParam("startblock", 0)
-                .queryParam("endblock", 999999999)
-                .queryParam("offset", 100)
-                .queryParam("sort", "asc");
 
-        JsonNode result = objectMapper.readTree(restTemplate.getForObject(builder.toUriString(), String.class));
-        if (!result.has("result") || !result.get("result").isArray()) {
-            throw new JsonProcessingException("Invalid response from Etherscan API: " + result.toString()) {};
-        }else{
-        }
-        return objectMapper.readValue(
-                result.get("result").toString(),
-                objectMapper.getTypeFactory().constructCollectionType(List.class, EthTransaction.class)
-        );
-    }
 }

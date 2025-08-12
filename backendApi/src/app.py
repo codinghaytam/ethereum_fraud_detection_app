@@ -17,7 +17,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
 
 # Import after setting up environment and path
 import requests
-from modelLoader import predict_address_state
+from modelLoader import predict_address_fraud
 
 # Load model using the new generic approach
 
@@ -40,19 +40,12 @@ async def process_addresses(address: str):
             model_dir = os.path.join(script_dir, '..', 'model')+'/'
             
             # Fallback to relative path if absolute doesn't work
-            if not os.path.exists(model_dir):
-                model_dir = '../model/'
             
-            prediction = predict_address_state(
-                address=address, 
-                apikey=ETHERSCAN_API_KEY, 
-                modelDir=model_dir
+            prediction = predict_address_fraud(
+                ethereum_address=address,
+                etherscan_api_key=ETHERSCAN_API_KEY,
             )
-            return {
-                "address": address,
-                "prediction": prediction["result"],
-                "transactions_used": prediction["transactionsUsed"],
-            }
+            return prediction
     except requests.RequestException as e:
         raise HTTPException(status_code=500, detail=f"Request error: {str(e)}")
     except Exception as e:

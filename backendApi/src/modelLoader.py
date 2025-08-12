@@ -1,341 +1,86 @@
-import warnings
-import json
-import datetime
-import time
+#!/usr/bin/env python3
+"""
+Ethereum Address Fraud Prediction using Etherscan API
+
+This module provides a function to predict fraud for any Ethereum address
+by fetching transaction data from Etherscan API and using the trained model.
+"""
+
+import pandas as pd
+import numpy as np
+import torch
+import torch.nn as nn
 import requests
-import pickle
-
-# Import core libraries with error handling
-try:
-    import numpy as np
-    print("✓ NumPy loaded successfully")
-except ImportError as e:
-    print(f"✗ Error importing NumPy: {e}")
-    raise
-
-try:
-    import pandas as pd
-    print("✓ Pandas loaded successfully") 
-except ImportError as e:
-    print(f"✗ Error importing Pandas: {e}")
-    raise
-
-try:
-    import torch
-    import torch.nn as nn
-    print("✓ PyTorch loaded successfully")
-except ImportError as e:
-    print(f"✗ Error importing PyTorch: {e}")
-    raise
-
-try:
-    from sklearn.preprocessing import StandardScaler
-    from torch.utils.data import Dataset, DataLoader
-    print("✓ ML libraries loaded successfully")
-except ImportError as e:
-    print(f"✗ Error importing ML libraries: {e}")
-    raise
-
+import time
+from datetime import datetime
+import warnings
 warnings.filterwarnings('ignore')
 
-# Check for CUDA availability and set device
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(f"Using device: {device}")
+# =============================================================================
+# CONFIGURATION VARIABLES
+# =============================================================================
 
-class EtherscanAPI:
-    """Simple wrapper for Etherscan API to fetch transaction data"""
+# API Configuration
+DEFAULT_ETHERSCAN_API_KEY = "WT5E1QCQAEGK556D626MCTTNA7W4GERA7T"  # Get from https://etherscan.io/apis
+ETHERSCAN_BASE_URL = "https://api.etherscan.io/api"
+API_REQUEST_TIMEOUT = 30
+API_RATE_LIMIT_DELAY = 0.2  # Etherscan allows 5 requests per second
 
-    def __init__(self, api_key=None):
-        self.api_key = api_key
-        self.base_url = "https://api.etherscan.io/api"
-        self.rate_limit_delay = 0.2  # 200ms delay between requests to respect rate limits
+# Transaction Fetching Configuration
+DEFAULT_MAX_TRANSACTIONS = 50
 
-    def get_transactions(self, address, start_block=0, end_block=99999999, page=1, offset=10000):
-       
-        params = {
-            'module': 'account',
-            'action': 'txlist',
-            'address': address,
-            'startblock': start_block,
-            'endblock': end_block,
-            'page': page,
-            'offset': offset,
-            'sort': 'desc'  # Most recent first
-        }
+# Model Configuration
+DEFAULT_MODEL_PATH = "../model/address_fraud_classifier_lstm.pth"
+MAX_SEQUENCE_LENGTH = 50
+HIDDEN_SIZE = 128
+NUM_LAYERS = 2
+NUM_CLASSES = 2
+FC_HIDDEN_SIZES = [256, 128]
+DROPOUT_RATE = 0.3
 
-        if self.api_key:
-            params['apikey'] = self.api_key
+# Feature Configuration
+FRAUD_THRESHOLD = 0.5  # Threshold for fraud classification
 
-        try:
-            response = requests.get(self.base_url, params=params, timeout=10)
-            time.sleep(self.rate_limit_delay)  # Rate limiting
+# Expected static feature columns (in order)
+EXPECTED_STATIC_FEATURES = [
+    'total_transactions', 'avg_gas', 'max_gas', 'total_gas',
+    'avg_gas_price', 'max_gas_price', 'avg_gas_used', 'total_gas_used',
+    'avg_transaction_value', 'max_transaction_value', 'total_transaction_value',
+    'error_rate', 'total_errors', 'avg_tx_status', 'time_span',
+    'avg_time_between_tx', 'unique_to_addresses', 'unique_functions', 'unique_methods'
+]
 
-            if response.status_code == 200:
-                data = response.json()
-                if data['status'] == '1':
-                    return data['result']
-                else:
-                    print(f"API Error: {data.get('message', 'Unknown error')}")
-                    return []
-            else:
-                print(f"HTTP Error: {response.status_code}")
-                return []
+# Etherscan API response columns to convert to numeric
+ETHERSCAN_NUMERIC_COLUMNS = [
+    'blockNumber', 'timeStamp', 'nonce', 'value', 'gas', 'gasPrice', 
+    'gasUsed', 'isError', 'txreceipt_status', 'confirmations'
+]
 
-        except Exception as e:
-            print(f"Error fetching transactions: {e}")
-            return []
+# Column mapping for Etherscan API response
+ETHERSCAN_COLUMN_MAPPING = {
+    'from': 'from_address',
+    'to': 'to_address',
+    'timeStamp': 'timestamp_numeric'
+}
 
-    def get_internal_transactions(self, address, start_block=0, end_block=99999999, page=1, offset=10000):
-        """Fetch internal transactions for an address"""
-        params = {
-            'module': 'account',
-            'action': 'txlistinternal',
-            'address': address,
-            'startblock': start_block,
-            'endblock': end_block,
-            'page': page,
-            'offset': offset,
-            'sort': 'desc'
-        }
+# Example usage configuration
+TEST_ADDRESS = "0x742dA6cCB3B4cB1BC8F6Ce1A9C5b5b3e1234567890"  # Replace with actual address
 
-        if self.api_key:
-            params['apikey'] = self.api_key
+# =============================================================================
+# END CONFIGURATION VARIABLES
+# =============================================================================
 
-        try:
-            response = requests.get(self.base_url, params=params, timeout=10)
-            time.sleep(self.rate_limit_delay)
-
-            if response.status_code == 200:
-                data = response.json()
-                if data['status'] == '1':
-                    return data['result']
-                else:
-                    return []
-            else:
-                return []
-
-        except Exception as e:
-            print(f"Error fetching internal transactions: {e}")
-            return []
-
-    def get_erc20_transfers(self, address, start_block=0, end_block=99999999, page=1, offset=10000):
-        """Fetch ERC20 token transfers for an address"""
-        params = {
-            'module': 'account',
-            'action': 'tokentx',
-            'address': address,
-            'startblock': start_block,
-            'endblock': end_block,
-            'page': page,
-            'offset': offset,
-            'sort': 'desc'
-        }
-
-        if self.api_key:
-            params['apikey'] = self.api_key
-
-        try:
-            response = requests.get(self.base_url, params=params, timeout=10)
-            time.sleep(self.rate_limit_delay)
-
-            if response.status_code == 200:
-                data = response.json()
-                if data['status'] == '1':
-                    return data['result']
-                else:
-                    return []
-            else:
-                return []
-
-        except Exception as e:
-            print(f"Error fetching ERC20 transfers: {e}")
-            return []
-
-class TransactionAnalyzer:
-
-    @staticmethod
-    def extract_static_features(address, normal_txs):
+class AddressFraudClassifier(nn.Module):
+    """LSTM-based neural network for address-level fraud classification using transaction sequences"""
+    
+    def __init__(self, sequence_input_size, static_input_size=0, hidden_size=HIDDEN_SIZE, num_layers=NUM_LAYERS, 
+                 fc_hidden_sizes=FC_HIDDEN_SIZES, num_classes=NUM_CLASSES, dropout_rate=DROPOUT_RATE):
+        super(AddressFraudClassifier, self).__init__()
         
-        features = {}
-        
-        # Convert address to lowercase for comparison
-        address = address.lower()
-        
-        # Normal transaction analysis
-        sent_txs = [tx for tx in normal_txs if tx['from'].lower() == address]
-        received_txs = [tx for tx in normal_txs if tx['to'].lower() == address]
-        
-        # Basic counts
-        features['Sent tnx'] = len(sent_txs)
-        features['Received Tnx'] = len(received_txs)
-        features['Number of Created Contracts'] = len([tx for tx in sent_txs if tx['to'] == ''])
-        
-        # Unique addresses
-        unique_sent_to = set(tx['to'].lower() for tx in sent_txs if tx['to'])
-        unique_received_from = set(tx['from'].lower() for tx in received_txs)
-        features['Unique Sent To Addresses'] = len(unique_sent_to)
-        features['Unique Received From Addresses'] = len(unique_received_from)
-        
-        # Value analysis (convert from wei to ether)
-        def safe_float_conversion(value):
-            """Safely convert value to float, handling edge cases"""
-            try:
-                if not value or value == '':
-                    return 0.0
-                return float(value) / 1e18
-            except (ValueError, TypeError):
-                return 0.0
-        
-        sent_values = [safe_float_conversion(tx['value']) for tx in sent_txs]
-        received_values = [safe_float_conversion(tx['value']) for tx in received_txs]
-        
-        features['min val sent'] = min(sent_values) if sent_values else 0
-        features['max val sent'] = max(sent_values) if sent_values else 0
-        features['avg val sent'] = sum(sent_values) / len(sent_values) if sent_values else 0
-        features['total Ether sent'] = sum(sent_values)
-        
-        features['min value received'] = min(received_values) if received_values else 0
-        features['max value received '] = max(received_values) if received_values else 0  # Note: space in name matches training data
-        features['avg val received'] = sum(received_values) / len(received_values) if received_values else 0
-        features['total ether received'] = sum(received_values)
-        
-        # Time analysis
-        def safe_int_conversion(value):
-            """Safely convert value to int, handling edge cases"""
-            try:
-                if not value or value == '':
-                    return 0
-                return int(value)
-            except (ValueError, TypeError):
-                return 0
-        
-        if normal_txs:
-            timestamps = [safe_int_conversion(tx['timeStamp']) for tx in normal_txs]
-            timestamps = [ts for ts in timestamps if ts > 0]  # Filter out invalid timestamps
-            timestamps.sort()
-            
-            if len(timestamps) > 1:
-                features['Time Diff between first and last (Mins)'] = (timestamps[-1] - timestamps[0]) / 60
-                
-                sent_timestamps = [safe_int_conversion(tx['timeStamp']) for tx in sent_txs]
-                received_timestamps = [safe_int_conversion(tx['timeStamp']) for tx in received_txs]
-                
-                # Filter out invalid timestamps
-                sent_timestamps = [ts for ts in sent_timestamps if ts > 0]
-                received_timestamps = [ts for ts in received_timestamps if ts > 0]
-                
-                if len(sent_timestamps) > 1:
-                    sent_diffs = [(sent_timestamps[i] - sent_timestamps[i-1]) / 60 for i in range(1, len(sent_timestamps))]
-                    features['Avg min between sent tnx'] = sum(sent_diffs) / len(sent_diffs)
-                else:
-                    features['Avg min between sent tnx'] = 0
-                    
-                if len(received_timestamps) > 1:
-                    received_diffs = [(received_timestamps[i] - received_timestamps[i-1]) / 60 for i in range(1, len(received_timestamps))]
-                    features['Avg min between received tnx'] = sum(received_diffs) / len(received_diffs)
-                else:
-                    features['Avg min between received tnx'] = 0
-            else:
-                features['Time Diff between first and last (Mins)'] = 0
-                features['Avg min between sent tnx'] = 0
-                features['Avg min between received tnx'] = 0
-        else:
-            features['Time Diff between first and last (Mins)'] = 0
-            features['Avg min between sent tnx'] = 0
-            features['Avg min between received tnx'] = 0
-        
-        # Contract interaction analysis
-        def safe_hex_to_int(hex_str):
-            """Safely convert hex string to int, handling edge cases"""
-            if not hex_str or hex_str == '0x':
-                return 0
-            try:
-                return int(hex_str, 16)
-            except ValueError:
-                return 0
-        
-        contract_txs = [tx for tx in sent_txs if tx['to'] and safe_hex_to_int(tx['input']) != 0]
-        contract_values = [safe_float_conversion(tx['value']) for tx in contract_txs]
-        
-        features['min value sent to contract'] = min(contract_values) if contract_values else 0
-        features['max val sent to contract'] = max(contract_values) if contract_values else 0
-        features['avg value sent to contract'] = sum(contract_values) / len(contract_values) if contract_values else 0
-        features['total ether sent contracts'] = sum(contract_values)
-        
-        # Total transaction count
-        features['total transactions (including tnx to create contract'] = len(normal_txs)
-        
-        # Balance calculation (approximation)
-        features['total ether balance'] = features['total ether received'] - features['total Ether sent']
-        
-        return features
-
-    @staticmethod
-    def create_transaction_sequence(normal_txs, sequence_length=100):
-        
-        all_txs = []
-        
-        # Add normal transactions
-        for tx in normal_txs:
-            try:
-                all_txs.append({
-                    'timestamp': int(tx['timeStamp']) if tx['timeStamp'] else 0,
-                    'value': float(tx['value']) / 1e18 if tx['value'] else 0.0,
-                    'gas': int(tx['gas']) if tx['gas'] else 0,
-                    'gasPrice': int(tx['gasPrice']) if tx['gasPrice'] else 0,
-                    'gasUsed': int(tx['gasUsed']) if tx['gasUsed'] and tx['gasUsed'] != '' else 0,
-                    'isError': int(tx['isError']) if tx['isError'] and tx['isError'] != '' else 0,
-                    'txType': 0,  # Normal transaction
-                    'blockNumber': int(tx['blockNumber']) if tx['blockNumber'] else 0,
-                    'transactionIndex': int(tx['transactionIndex']) if tx['transactionIndex'] else 0,
-                    'confirmations': int(tx['confirmations']) if tx['confirmations'] and tx['confirmations'] != '' else 0
-                })
-            except (ValueError, TypeError) as e:
-                # Skip invalid transactions
-                print(f"Warning: Skipping invalid transaction: {e}")
-                continue
-        
-        # Sort by timestamp (most recent first)
-        all_txs.sort(key=lambda x: x['timestamp'], reverse=True)
-        
-        # Take only the required number of transactions
-        all_txs = all_txs[:sequence_length]
-        
-        # Convert to feature matrix
-        features = []
-        for tx in all_txs:
-            # Create feature vector matching training data (10 features)
-            feature_vector = [
-                tx['timestamp'] % 1000000,  # Normalized timestamp
-                tx['value'],
-                tx['gas'] / 1e6,  # Normalized gas
-                tx['gasPrice'] / 1e9,  # Normalized gas price (Gwei)
-                tx['gasUsed'] / 1e6,  # Normalized gas used
-                tx['isError'],
-                tx['txType'],
-                tx['blockNumber'] % 1000000,  # Normalized block number
-                tx['transactionIndex'],
-                tx['confirmations'] / 100  # Normalized confirmations
-            ]
-            features.append(feature_vector)
-        
-        # Pad with zeros if we have fewer transactions than sequence_length
-        while len(features) < sequence_length:
-            features.append([0.0] * 10)
-        
-        return np.array(features, dtype=np.float32)
-
-class FraudClassifier(nn.Module):
-    """Fraud Detection Model Architecture - matches your training script exactly"""
-
-    def __init__(self, sequence_input_size, static_input_size=0, hidden_size=128, num_layers=2,
-                 fc_hidden_sizes=[256, 128], num_classes=2, dropout_rate=0.3):
-        super(FraudClassifier, self).__init__()
-
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.static_input_size = static_input_size
-
+        
         # LSTM for sequential transaction data
         self.lstm = nn.LSTM(
             input_size=sequence_input_size,
@@ -345,15 +90,15 @@ class FraudClassifier(nn.Module):
             dropout=dropout_rate if num_layers > 1 else 0,
             bidirectional=True
         )
-
+        
         # Calculate the combined feature size
         lstm_output_size = hidden_size * 2  # bidirectional
         combined_size = lstm_output_size + static_input_size
-
+        
         # Fully connected layers
         fc_layers = []
         prev_size = combined_size
-
+        
         for fc_hidden_size in fc_hidden_sizes:
             fc_layers.extend([
                 nn.Linear(prev_size, fc_hidden_size),
@@ -362,300 +107,475 @@ class FraudClassifier(nn.Module):
                 nn.Dropout(dropout_rate)
             ])
             prev_size = fc_hidden_size
-
+        
         # Output layer
         fc_layers.append(nn.Linear(prev_size, num_classes))
+        
         self.classifier = nn.Sequential(*fc_layers)
-
+        
     def forward(self, sequences, static_features=None):
         batch_size = sequences.size(0)
-
+        
         # Initialize hidden state
         h0 = torch.zeros(self.num_layers * 2, batch_size, self.hidden_size).to(sequences.device)
         c0 = torch.zeros(self.num_layers * 2, batch_size, self.hidden_size).to(sequences.device)
-
+        
         # LSTM forward pass
         lstm_out, (hn, cn) = self.lstm(sequences, (h0, c0))
-
+        
         # Use the last output from LSTM
         lstm_features = lstm_out[:, -1, :]
-
-        # Combine with static features if available
+        
+        # Combine LSTM features with static features if available
         if static_features is not None and self.static_input_size > 0:
             combined_features = torch.cat([lstm_features, static_features], dim=1)
         else:
             combined_features = lstm_features
-
+        
         # Pass through classifier
         output = self.classifier(combined_features)
         return output
 
-
-class FraudDetectionModel:
- 
-
-    def __init__(self, model_dir='./model/', etherscan_api_key=None):
-        self.model_dir = model_dir
-        self.model = None
-        self.scaler = None
-        self.feature_columns = None
-        self.config = None
-        self.device = device
-        
-        # Initialize Etherscan API
-        self.etherscan = EtherscanAPI(etherscan_api_key)
-        self.analyzer = TransactionAnalyzer()
-
-       
-        self._load_model()
-
-    def _load_model(self):
-        """Load the trained model and all components"""
-        try:
-            print("Loading fraud detection model...")
-
-            # Load model configuration
-            with open(f'{self.model_dir}model_config.pkl', 'rb') as f:
-                self.config = pickle.load(f)
-
-            # Load static feature scaler
-            with open(f'{self.model_dir}static_scaler.pkl', 'rb') as f:
-                self.scaler = pickle.load(f)
-
-            # Load feature column names
-            with open(f'{self.model_dir}static_feature_columns.pkl', 'rb') as f:
-                saved_columns = pickle.load(f)
-
-            # Use only the features the scaler expects
-            expected_features = self.scaler.n_features_in_
-            self.feature_columns = saved_columns[:expected_features]
-
-            print(f"✓ Loaded {len(self.feature_columns)} static features")
-            print(f"✓ Model expects {expected_features} features")
-
-            # Initialize model
-            self.model = FraudClassifier(
-                sequence_input_size=self.config['sequence_input_size'],
-                static_input_size=self.config['static_input_size'],
-                hidden_size=self.config['hidden_size'],
-                num_layers=self.config['num_layers'],
-                fc_hidden_sizes=self.config['fc_hidden_sizes'],
-                num_classes=self.config['num_classes'],
-                dropout_rate=self.config['dropout_rate']
-            )
-
-            # Load trained weights
-            model_state = torch.load(f'{self.model_dir}fraud_classifier.pth', map_location='cpu')
-            self.model.load_state_dict(model_state)
-            self.model.to(self.device)
-            self.model.eval()
-
-            print("✓ Model loaded successfully!")
-
-        except Exception as e:
-            print(f"✗ Error loading model: {e}")
-            raise
-
-    def analyze_address_from_etherscan(self, address, max_transactions=100):
-       
-        print(f"Analyzing address: {address}")
-        
-        try:
-            # Fetch different types of transactions
-            print("  - Fetching normal transactions...")
-            normal_txs = self.etherscan.get_transactions(address, offset=max_transactions)
-            
-            # Extract static features
-            print("Extracting features...")
-            static_features = self.analyzer.extract_static_features(address, normal_txs)
-            
-            # Create transaction sequence
-            transaction_sequence = self.analyzer.create_transaction_sequence(
-                normal_txs, self.config['sequence_length']
-            )
-            
-            # Make prediction
-            result = self._predict_with_sequence(static_features, transaction_sequence)
-            
-            # Add transaction summary
-            result['total_transactions'] = len(normal_txs)
-            result['timestamp'] = datetime.datetime.now().isoformat()
-            
-            return {
-                "result":result,
-                "transactionsUsed":normal_txs
-            }
-            
-        except Exception as e:
-            print(f"Error analyzing address: {e}")
-            return None
-
-    def _predict_with_sequence(self, static_features, transaction_sequence):
-        
-        try:
-            # Prepare static features
-            feature_dict = static_features.copy()
-            
-            # Add missing features with zeros
-            for col in self.feature_columns:
-                if col not in feature_dict:
-                    feature_dict[col] = 0.0
-
-            # Create DataFrame and select features in correct order
-            df = pd.DataFrame([feature_dict])
-            features = df[self.feature_columns].values
-
-            # Scale features
-            features_scaled = self.scaler.transform(features).astype(np.float32)
-
-            # Prepare transaction sequence
-            if transaction_sequence.shape[0] == 1:
-                sequence_tensor = torch.FloatTensor(transaction_sequence).to(self.device)
-            else:
-                sequence_tensor = torch.FloatTensor(transaction_sequence.reshape(1, *transaction_sequence.shape)).to(self.device)
-            
-            static_tensor = torch.FloatTensor(features_scaled).to(self.device)
-
-            # Make prediction
-            with torch.no_grad():
-                outputs = self.model(sequence_tensor, static_tensor)
-                probabilities = torch.softmax(outputs, dim=1)
-                predicted_class = torch.argmax(outputs, dim=1)
-
-                # Get results
-                fraud_prob = probabilities[0][1].cpu().item()
-                normal_prob = probabilities[0][0].cpu().item()
-                prediction = predicted_class[0].cpu().item()
-
-            return {
-                'prediction': 'Fraud' if prediction == 1 else 'Normal',
-                'fraud_probability': fraud_prob,
-                'normal_probability': normal_prob,
-                'confidence': max(fraud_prob, normal_prob),
-                'is_fraud': prediction == 1,
-                'features_used': len(self.feature_columns),
-                'sequence_length': transaction_sequence.shape[0] if len(transaction_sequence.shape) > 1 else 1
-            }
-
-        except Exception as e:
-            print(f"Error making prediction: {e}")
-            return None
-
-    def predict_address(self, address_features):
-       
-        try:
-            # Prepare features
-            feature_dict = address_features.copy()
-
-            # Add missing features with zeros
-            for col in self.feature_columns:
-                if col not in feature_dict:
-                    feature_dict[col] = 0.0
-
-            # Create DataFrame and select features in correct order
-            df = pd.DataFrame([feature_dict])
-            features = df[self.feature_columns].values
-
-            # Scale features
-            features_scaled = self.scaler.transform(features).astype(np.float32)
-
-            # Create dummy transaction sequence
-            sequence_length = self.config['sequence_length']
-            sequence_input_size = self.config['sequence_input_size']
-            dummy_sequence = np.zeros((1, sequence_length, sequence_input_size), dtype=np.float32)
-
-            # Convert to tensors
-            sequence_tensor = torch.FloatTensor(dummy_sequence).to(self.device)
-            static_tensor = torch.FloatTensor(features_scaled).to(self.device)
-
-            # Make prediction
-            with torch.no_grad():
-                outputs = self.model(sequence_tensor, static_tensor)
-                probabilities = torch.softmax(outputs, dim=1)
-                predicted_class = torch.argmax(outputs, dim=1)
-
-                # Get results
-                fraud_prob = probabilities[0][1].cpu().item()
-                normal_prob = probabilities[0][0].cpu().item()
-                prediction = predicted_class[0].cpu().item()
-
-            return {
-                'prediction': 'Fraud' if prediction == 1 else 'Normal',
-                'fraud_probability': fraud_prob,
-                'normal_probability': normal_prob,
-                'confidence': max(fraud_prob, normal_prob),
-                'is_fraud': prediction == 1
-            }
-
-        except Exception as e:
-            print(f"Error making prediction: {e}")
-            return None
-
-    def batch_analyze_addresses(self, addresses_list, max_transactions=1000, save_results=True):
-        
-        results = []
-        
-        print(f"Analyzing {len(addresses_list)} addresses...")
-        
-        for i, address in enumerate(addresses_list):
-            print(f"\nAnalyzing address {i+1}/{len(addresses_list)}: {address}")
-            
-            result = self.analyze_address_from_etherscan(address, max_transactions)
-            
-            if result:
-                result['address'] = address
-                result['batch_index'] = i
-                results.append(result)
-                
-                # Show quick result
-                status = "🚨 FRAUD" if result['is_fraud'] else "✅ NORMAL"
-                confidence = result['confidence']
-                print(f"   Result: {status} (confidence: {confidence:.3f})")
-            else:
-                print(f"   ❌ Analysis failed for {address}")
-            
-            # Rate limiting - pause between addresses
-            if i < len(addresses_list) - 1:
-                time.sleep(1)  # 1 second between addresses
-        
-        # Save results if requested
-        if save_results and results:
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"fraud_analysis_results_{timestamp}.json"
-            
-            with open(filename, 'w') as f:
-                json.dump(results, f, indent=2, default=str)
-            
-            print(f"\n✓ Results saved to {filename}")
-        
-        return results
-
-    def get_feature_importance(self):
-        """Get the list of features used by the model"""
-        return {
-            'static_features': self.feature_columns,
-            'num_static_features': len(self.feature_columns),
-            'sequence_length': self.config['sequence_length'],
-            'sequence_input_size': self.config['sequence_input_size']
-        }
-
-    def get_model_info(self):
-        """Get model configuration information"""
-        return {
-            'model_type': 'LSTM + Static Features with Etherscan Integration',
-            'device': str(self.device),
-            'config': self.config,
-            'num_features': len(self.feature_columns),
-            'feature_columns': self.feature_columns,
-            'etherscan_enabled': True
-        }
-
-
-def load_fraud_model_with_etherscan(etherscan_api_key=None, model_dir='../model/'):
+def fetch_etherscan_transactions(address, api_key, max_transactions=DEFAULT_MAX_TRANSACTIONS):
+    """
+    Fetch transaction data from Etherscan API for a given address
     
-    return FraudDetectionModel(model_dir, etherscan_api_key)
+    Args:
+        address (str): Ethereum address to analyze
+        api_key (str): Etherscan API key
+        max_transactions (int): Maximum number of transactions to fetch
+    
+    Returns:
+        pd.DataFrame: Transaction data
+    """
+    print(f"Fetching transactions for address: {address}")
+    
+    base_url = "https://api.etherscan.io/api"
+    
+    all_transactions = []
+    page = 1
+    offset = DEFAULT_MAX_TRANSACTIONS
+    
+    while len(all_transactions) < max_transactions:
+        # Calculate start block for pagination
+        start_block = (page - 1) * offset + 1 if page > 1 else 0
+        
+        params = {
+            'module': 'account',
+            'action': 'txlist',
+            'address': address,
+            'startblock': start_block,
+            'endblock': 99999999,
+            'page': page,
+            'offset': offset,
+            'sort': 'asc',
+            'apikey': api_key
+        }
+        
+        try:
+            response = requests.get(ETHERSCAN_BASE_URL, params=params, timeout=API_REQUEST_TIMEOUT)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            if data['status'] != '1':
+                if 'No transactions found' in data.get('message', ''):
+                    print("No transactions found for this address")
+                    break
+                else:
+                    print(f"API Error: {data.get('message', 'Unknown error')}")
+                    break
+            
+            transactions = data['result']
+            
+            if not transactions:
+                print("No more transactions to fetch")
+                break
+            
+            all_transactions.extend(transactions)
+            print(f"Fetched {len(transactions)} transactions (total: {len(all_transactions)})")
+            
+            # If we got fewer transactions than requested, we've reached the end
+            if len(transactions) < offset:
+                break
+            
+            page += 1
+            
+            # Rate limiting - Etherscan allows 5 requests per second
+            time.sleep(API_RATE_LIMIT_DELAY)
+            
+        except requests.exceptions.RequestException as e:
+            print(f"Request error: {e}")
+            break
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+            break
+    
+    if not all_transactions:
+        print("No transactions found for this address")
+        return None
+    
+    # Convert to DataFrame
+    df = pd.DataFrame(all_transactions)
+    
+    # Convert numeric columns
+    for col in ETHERSCAN_NUMERIC_COLUMNS:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+    
+    # Convert timestamp to datetime
+    if 'timeStamp' in df.columns:
+        df['timestamp'] = pd.to_datetime(df['timeStamp'], unit='s')
+    
+    # Rename columns to match model expectations
+    df = df.rename(columns=ETHERSCAN_COLUMN_MAPPING)
+    
+    # Add source_address column (same as from_address for consistency)
+    if 'from_address' in df.columns:
+        df['source_address'] = df['from_address']
+    
+    print(f"Successfully fetched {len(df)} transactions")
+    return df
 
+def prepare_address_features(transaction_df, target_address, max_sequence_length=MAX_SEQUENCE_LENGTH):
+    """
+    Prepare features for the target address from transaction data
+    
+    Args:
+        transaction_df (pd.DataFrame): Transaction data
+        target_address (str): Address to analyze
+        max_sequence_length (int): Maximum sequence length for LSTM
+    
+    Returns:
+        tuple: (static_features, sequences, sequence_feature_names)
+    """
+    if transaction_df is None or len(transaction_df) == 0:
+        return None, None, None
+    
+    print("Preparing address features...")
+    
+    # Debug: Print column names and sample data
+    print(f"Transaction DataFrame columns: {list(transaction_df.columns)}")
+    print(f"Sample from_address values: {transaction_df['from_address'].head().tolist()}")
+    print(f"Sample to_address values: {transaction_df['to_address'].head().tolist()}")
+    
+    # Normalize address case
+    target_address = target_address.lower()
+    print(f"Looking for target address: {target_address}")
+    
+    # Filter transactions for the target address (as sender OR receiver)
+    # The address can be either the sender (from) or receiver (to)
+    from_mask = transaction_df['from_address'].str.lower() == target_address
+    to_mask = transaction_df['to_address'].str.lower() == target_address
+    
+    address_txs = transaction_df[from_mask | to_mask].copy()
+    
+    print(f"Transactions where address is sender: {from_mask.sum()}")
+    print(f"Transactions where address is receiver: {to_mask.sum()}")
+    
+    if len(address_txs) == 0:
+        print("No transactions found for the target address")
+        return None, None, None
+    
+    print(f"Found {len(address_txs)} transactions for address {target_address}")
+    
+    # Sort by timestamp
+    if 'timestamp' in address_txs.columns:
+        address_txs = address_txs.sort_values('timestamp')
+    elif 'timestamp_numeric' in address_txs.columns:
+        address_txs = address_txs.sort_values('timestamp_numeric')
+    
+    # Prepare sequence features
+    sequence_features = []
+    
+    # Gas-related features
+    if 'gas' in address_txs.columns:
+        address_txs['gas_numeric'] = pd.to_numeric(address_txs['gas'], errors='coerce').fillna(0)
+        sequence_features.append('gas_numeric')
+    
+    if 'gasPrice' in address_txs.columns:
+        address_txs['gas_price_numeric'] = pd.to_numeric(address_txs['gasPrice'], errors='coerce').fillna(0)
+        sequence_features.append('gas_price_numeric')
+    elif 'gasPrice' in address_txs.columns:
+        address_txs['gas_price_numeric'] = pd.to_numeric(address_txs['gasPrice'], errors='coerce').fillna(0)
+        sequence_features.append('gas_price_numeric')
+    
+    if 'gasUsed' in address_txs.columns:
+        address_txs['gas_used_numeric'] = pd.to_numeric(address_txs['gasUsed'], errors='coerce').fillna(0)
+        sequence_features.append('gas_used_numeric')
+    
+    # Value features
+    if 'value' in address_txs.columns:
+        address_txs['value_numeric'] = pd.to_numeric(address_txs['value'], errors='coerce').fillna(0)
+        sequence_features.append('value_numeric')
+    
+    # Error and status features
+    if 'isError' in address_txs.columns:
+        address_txs['is_error_numeric'] = pd.to_numeric(address_txs['isError'], errors='coerce').fillna(0)
+        sequence_features.append('is_error_numeric')
+    
+    if 'txreceipt_status' in address_txs.columns:
+        address_txs['txreceipt_status_numeric'] = pd.to_numeric(address_txs['txreceipt_status'], errors='coerce').fillna(0)
+        sequence_features.append('txreceipt_status_numeric')
+    
+    # Time-based features
+    if 'timestamp' in address_txs.columns:
+        address_txs['hour_of_day'] = address_txs['timestamp'].dt.hour
+        address_txs['day_of_week'] = address_txs['timestamp'].dt.dayofweek
+        sequence_features.extend(['hour_of_day', 'day_of_week'])
+        
+        # Time differences
+        address_txs['timestamp_numeric'] = address_txs['timestamp'].astype('int64') // 10**9
+        address_txs['time_diff'] = address_txs['timestamp_numeric'].diff().fillna(0)
+        sequence_features.append('time_diff')
+    elif 'timestamp_numeric' in address_txs.columns:
+        address_txs['time_diff'] = address_txs['timestamp_numeric'].diff().fillna(0)
+        sequence_features.append('time_diff')
+    
+    print(f"Sequence features: {sequence_features}")
+    
+    if not sequence_features:
+        print("No valid sequence features found")
+        return None, None, None
+    
+    # Create sequence data
+    seq_data = address_txs[sequence_features].values
+    
+    # Pad or truncate to max_sequence_length
+    if len(seq_data) > max_sequence_length:
+        seq_data = seq_data[-max_sequence_length:]  # Take most recent transactions
+    elif len(seq_data) < max_sequence_length:
+        padding = np.zeros((max_sequence_length - len(seq_data), len(sequence_features)))
+        seq_data = np.vstack([padding, seq_data])
+    
+    # Prepare static features
+    static_features = {}
+    
+    # Transaction count
+    static_features['total_transactions'] = len(address_txs)
+    
+    # Gas-related aggregates
+    if 'gas' in address_txs.columns:
+        static_features['avg_gas'] = address_txs['gas'].mean()
+        static_features['max_gas'] = address_txs['gas'].max()
+        static_features['total_gas'] = address_txs['gas'].sum()
+    
+    if 'gasPrice' in address_txs.columns:
+        static_features['avg_gas_price'] = address_txs['gasPrice'].mean()
+        static_features['max_gas_price'] = address_txs['gasPrice'].max()
+    
+    if 'gasUsed' in address_txs.columns:
+        static_features['avg_gas_used'] = address_txs['gasUsed'].mean()
+        static_features['total_gas_used'] = address_txs['gasUsed'].sum()
+    
+    # Value-related aggregates
+    if 'value' in address_txs.columns:
+        value_numeric = pd.to_numeric(address_txs['value'], errors='coerce').fillna(0)
+        static_features['avg_transaction_value'] = value_numeric.mean()
+        static_features['max_transaction_value'] = value_numeric.max()
+        static_features['total_transaction_value'] = value_numeric.sum()
+    
+    # Error and status aggregates
+    if 'isError' in address_txs.columns:
+        static_features['error_rate'] = address_txs['isError'].mean()
+        static_features['total_errors'] = address_txs['isError'].sum()
+    
+    if 'txreceipt_status' in address_txs.columns:
+        status_numeric = pd.to_numeric(address_txs['txreceipt_status'], errors='coerce').fillna(0)
+        static_features['avg_tx_status'] = status_numeric.mean()
+    
+    # Time-based aggregates
+    if 'timestamp_numeric' in address_txs.columns:
+        static_features['time_span'] = address_txs['timestamp_numeric'].max() - address_txs['timestamp_numeric'].min()
+        static_features['avg_time_between_tx'] = static_features['time_span'] / static_features['total_transactions'] if static_features['total_transactions'] > 0 else 0
+    else:
+        static_features['time_span'] = 0
+        static_features['avg_time_between_tx'] = 0
+    
+    # Unique interactions
+    if 'to_address' in address_txs.columns:
+        static_features['unique_to_addresses'] = address_txs['to_address'].nunique()
+    else:
+        static_features['unique_to_addresses'] = 0
+    
+    # Function and method diversity (often not available in basic Etherscan data)
+    static_features['unique_functions'] = 0
+    static_features['unique_methods'] = 0
+    
+    # Fill any NaN values
+    for key, value in static_features.items():
+        if pd.isna(value):
+            static_features[key] = 0
+    
+    static_features_array = np.array(list(static_features.values())).reshape(1, -1)
+    sequences_array = seq_data.reshape(1, max_sequence_length, len(sequence_features))
+    
+    print(f"Static features shape: {static_features_array.shape}")
+    print(f"Sequences shape: {sequences_array.shape}")
+    
+    return static_features_array, sequences_array, sequence_features
 
-def predict_address_state(address,apikey, modelDir):
-    model = load_fraud_model_with_etherscan(etherscan_api_key=apikey, model_dir=modelDir)
-    return model.analyze_address_from_etherscan(address)
+def predict_address_fraud(ethereum_address, etherscan_api_key, model_path=DEFAULT_MODEL_PATH):
+    """
+    Predict fraud probability for an Ethereum address using transaction history
+    
+    Args:
+        ethereum_address (str): Ethereum address to analyze (with or without 0x prefix)
+        etherscan_api_key (str): Etherscan API key
+        model_path (str): Path to the trained model file
+    
+    Returns:
+        dict: {
+            'address': str,
+            'prediction': str ('Fraud' or 'Not Fraud'),
+            'confidence': float (0-1),
+            'fraud_probability': float (0-1),
+            'total_transactions': int,
+            'error': str or None
+        }
+    """
+    
+    try:
+        # Normalize address format
+        if not ethereum_address.startswith('0x'):
+            ethereum_address = '0x' + ethereum_address
+        ethereum_address = ethereum_address.lower()
+        
+        # Load the trained model
+        print("Loading trained model...")
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
+        try:
+            checkpoint = torch.load(model_path, map_location=device, weights_only=False)
+        except Exception as e:
+            return {
+                'address': ethereum_address,
+                'prediction': None,
+                'confidence': None,
+                'fraud_probability': None,
+                'total_transactions': 0,
+                'error': f"Failed to load model: {str(e)}"
+            }
+        
+        # Extract model configuration
+        config = checkpoint['model_config']
+        static_scaler = checkpoint.get('static_scaler')
+        sequence_scaler = checkpoint.get('sequence_scaler')
+        static_feature_cols = checkpoint.get('static_feature_cols', [])
+        
+        # Initialize model
+        model = AddressFraudClassifier(
+            sequence_input_size=config['sequence_input_size'],
+            static_input_size=config['static_input_size'],
+            hidden_size=config.get('hidden_size', HIDDEN_SIZE),
+            num_layers=config.get('num_layers', NUM_LAYERS),
+            num_classes=config.get('num_classes', NUM_CLASSES)
+        )
+        
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model.to(device)
+        model.eval()
+        
+        print("Model loaded successfully!")
+        
+        # Fetch transaction data from Etherscan
+        transaction_df = fetch_etherscan_transactions(ethereum_address, etherscan_api_key)
+        
+        if transaction_df is None or len(transaction_df) == 0:
+            return {
+                'address': ethereum_address,
+                'prediction': None,
+                'confidence': None,
+                'fraud_probability': None,
+                'total_transactions': 0,
+                'error': "No transactions found for this address"
+            }
+        
+        total_transactions = len(transaction_df)
+        
+        # Prepare features
+        static_features, sequences, _ = prepare_address_features(
+            transaction_df, ethereum_address, max_sequence_length=MAX_SEQUENCE_LENGTH
+        )
+        
+        if static_features is None or sequences is None:
+            return {
+                'address': ethereum_address,
+                'prediction': None,
+                'confidence': None,
+                'fraud_probability': None,
+                'total_transactions': total_transactions,
+                'error': "Failed to prepare features from transaction data"
+            }
+        
+        # Preprocess features using saved scalers
+        if static_scaler is not None and len(static_feature_cols) > 0:
+            # Create DataFrame with expected features, filling missing ones with zeros
+            static_features_df = pd.DataFrame(static_features, columns=EXPECTED_STATIC_FEATURES)
+            
+            # Align features with training features
+            aligned_features = pd.DataFrame(index=[0])
+            for feature in static_feature_cols:
+                if feature in static_features_df.columns:
+                    aligned_features[feature] = static_features_df[feature].iloc[0]
+                else:
+                    aligned_features[feature] = 0
+            
+            static_features_scaled = static_scaler.transform(aligned_features)
+        else:
+            static_features_scaled = static_features
+        
+        # Scale sequences
+        if sequence_scaler is not None:
+            seq_reshaped = sequences.reshape(-1, sequences.shape[-1])
+            seq_scaled = sequence_scaler.transform(seq_reshaped)
+            sequences_scaled = seq_scaled.reshape(sequences.shape)
+        else:
+            sequences_scaled = sequences
+        
+        # Convert to tensors
+        sequences_tensor = torch.FloatTensor(sequences_scaled).to(device)
+        static_features_tensor = torch.FloatTensor(static_features_scaled).to(device) if static_features_scaled is not None else None
+        
+        # Make prediction
+        print("Making prediction...")
+        with torch.no_grad():
+            outputs = model(sequences_tensor, static_features_tensor)
+            
+            # Handle NaN values
+            if torch.isnan(outputs).any():
+                outputs = torch.nan_to_num(outputs, nan=0.0)
+            
+            probabilities = torch.softmax(outputs, dim=1)
+            
+            if torch.isnan(probabilities).any():
+                probabilities = torch.nan_to_num(probabilities, nan=0.5)
+            
+            fraud_probability = probabilities[0, 1].item()  # Probability of fraud (class 1)
+            confidence = max(probabilities[0]).item()  # Confidence (max probability)
+            prediction = "Fraud" if fraud_probability > FRAUD_THRESHOLD else "Not Fraud"
+        
+        prediction_result = {
+            'address': ethereum_address,
+            'prediction': prediction,
+            'confidence': confidence,
+            'fraud_probability': fraud_probability,
+            'total_transactions': total_transactions,
+            'transaction_used': transaction_df.to_json(),
+            'error': None
+        }
+
+        
+        return prediction_result
+        
+    except Exception as e:
+        print(f"Error during prediction: {str(e)}")
+        return {
+            'address': ethereum_address,
+            'prediction': None,
+            'confidence': None,
+            'fraud_probability': None,
+            'total_transactions': 0,
+            'error': f"Prediction failed: {str(e)}"
+        }
+

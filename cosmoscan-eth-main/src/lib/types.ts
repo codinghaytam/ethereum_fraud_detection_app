@@ -7,7 +7,6 @@ export interface FraudExplanation {
 
 export interface AddressPredictionResponse {
   prediction: string;
-  is_fraud: boolean;
   address: string;
   fraud_probability: number;
   total_transactions: number;

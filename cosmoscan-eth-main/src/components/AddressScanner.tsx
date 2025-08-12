@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import CircularProgressDemo from '@/components/PercentageDisplay'; // Adjust the import based on your CircularProgress component
+import CircularProgressDemo, {CircularProgressDemoInvert} from '@/components/PercentageDisplay'; // Adjust the import based on your CircularProgress component
 
 import { getAddressPrediction } from '@/lib/utils'; // Adjust the import based on your API utility
 import { AddressPredictionResponse} from '@/lib/types'; // Adjust the import based on your types
@@ -58,7 +58,7 @@ export default function AddressScanner() {
 
   const getStatusColor = (prediction: string) => {
     switch (prediction.toLowerCase()) {
-      case 'normal': return 'bg-green-500 hover:bg-green-600 text-white';
+      case 'not fraud': return 'bg-green-500 hover:bg-green-600 text-white';
       case 'fraud': return 'bg-red-500 hover:bg-red-600 text-white';
       default: return 'bg-gray-500 hover:bg-gray-600 text-white';
     }
@@ -165,12 +165,12 @@ export default function AddressScanner() {
               </div>
               <div className="text-center">
                 <h4 className="text-sm font-medium mb-2 text-muted-foreground">Confidence</h4>
-                <CircularProgressDemo value={scanResult.confidence*100}  />
+                <CircularProgressDemoInvert value={scanResult.confidence*100}  />
               </div>
             </div>
 
             {/* Fraud Explanations - only show if address is fraudulent */}
-            {scanResult.is_fraud && scanResult.explanations && scanResult.explanations.length > 0 && (
+            {scanResult.prediction=="Fraud" && scanResult.explanations && scanResult.explanations.length > 0 && (
               <div className="space-y-4">
                 <h4 className="text-lg font-semibold text-red-600">⚠️ Fraud Indicators</h4>
                 <div className="space-y-4">

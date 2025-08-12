@@ -8,13 +8,11 @@ import java.util.List;
 
 @Data
 public class PredictionAndExplanationDTO {
-    private String prediction;
-    private Boolean is_fraud;
     private String address;
-    private int total_transactions;
-    private String analysis_timestamp;
-    private double confidence;
-    private String fraud_probability;
+    private String prediction;
+    private Double confidence;
+    private Double fraud_probability;
+    private Integer total_transactions;
     private List<Raison> explanations;
 
 }
