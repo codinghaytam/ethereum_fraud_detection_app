@@ -410,30 +410,11 @@ def prepare_address_features(transaction_df, target_address, max_sequence_length
     static_features_array = np.array(list(static_features.values())).reshape(1, -1)
     sequences_array = seq_data.reshape(1, max_sequence_length, len(sequence_features))
     
-    print(f"Static features shape: {static_features_array.shape}")
-    print(f"Sequences shape: {sequences_array.shape}")
     
     return static_features_array, sequences_array, sequence_features
 
 def predict_address_fraud(ethereum_address, etherscan_api_key, model_path=DEFAULT_MODEL_PATH):
-    """
-    Predict fraud probability for an Ethereum address using transaction history
     
-    Args:
-        ethereum_address (str): Ethereum address to analyze (with or without 0x prefix)
-        etherscan_api_key (str): Etherscan API key
-        model_path (str): Path to the trained model file
-    
-    Returns:
-        dict: {
-            'address': str,
-            'prediction': str ('Fraud' or 'Not Fraud'),
-            'confidence': float (0-1),
-            'fraud_probability': float (0-1),
-            'total_transactions': int,
-            'error': str or None
-        }
-    """
     
     try:
         # Normalize address format
@@ -442,7 +423,6 @@ def predict_address_fraud(ethereum_address, etherscan_api_key, model_path=DEFAUL
         ethereum_address = ethereum_address.lower()
         
         # Load the trained model
-        print("Loading trained model...")
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
         try:
@@ -528,7 +508,6 @@ def predict_address_fraud(ethereum_address, etherscan_api_key, model_path=DEFAUL
         static_features_tensor = torch.FloatTensor(static_features_scaled).to(device) if static_features_scaled is not None else None
         
         # Make prediction
-        print("Making prediction...")
         with torch.no_grad():
             outputs = model(sequences_tensor, static_features_tensor)
             
@@ -559,7 +538,6 @@ def predict_address_fraud(ethereum_address, etherscan_api_key, model_path=DEFAUL
         return prediction_result
         
     except Exception as e:
-        print(f"Error during prediction: {str(e)}")
         return {
             'address': ethereum_address,
             'prediction': None,
