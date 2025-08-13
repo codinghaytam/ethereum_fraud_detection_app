@@ -3,13 +3,13 @@ fastapi==0.116.1
 uvicorn[standard]==0.35.0
 python-dotenv==1.1.1
 requests==2.32.4
-pydantic==2.11.7
 
 # Core ML/Data processing - Updated to current stable versions
 numpy==2.3.1
 pandas==2.3.1
 scikit-learn==1.7.1
-torch==2.7.1
+--index-url https://download.pytorch.org/whl/cpu
+torch
 scipy==1.16.0
 
 # Additional dependencies
