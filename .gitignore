@@ -73,3 +73,5 @@ processed_*.npy
 
 # Logs
 *.log
+
+.vscode
