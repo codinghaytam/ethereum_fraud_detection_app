@@ -97,7 +97,19 @@ jobs:
           
           # Verify model files are included
           echo "Verifying model files are included..."
-          tar -tzf deployment.tar.gz | grep -E "backendApi/model/.*\.(pth|pkl)$" || echo "Warning: Model files may not be included"
+          echo "Looking for model files in deployment package:"
+          tar -tzf deployment.tar.gz | grep -E "backendApi/model/" | head -10
+          
+          # Specifically check for the new LSTM model
+          if tar -tzf deployment.tar.gz | grep -q "backendApi/model/address_fraud_classifier_lstm.pth"; then
+            echo "✅ New LSTM model file found in deployment package"
+          else
+            echo "❌ Warning: New LSTM model file NOT found in deployment package"
+          fi
+          
+          # Check for any model files
+          model_count=$(tar -tzf deployment.tar.gz | grep -E "backendApi/model/.*\.(pth|pkl)$" | wc -l)
+          echo "Total model files found: $model_count"
         else
           echo "Failed to create deployment package"
           exit 1
@@ -243,6 +255,19 @@ jobs:
         echo "Waiting for services to initialize..."
         sleep 60
         
+        # Verify model files are available in the container
+        echo "Verifying model files in FastAPI container..."
+        if docker-compose exec -T fastapi ls -la /app/model/ 2>/dev/null; then
+          echo "✅ Model directory accessible in container"
+          if docker-compose exec -T fastapi ls /app/model/address_fraud_classifier_lstm.pth 2>/dev/null; then
+            echo "✅ LSTM model file found in container"
+          else
+            echo "❌ LSTM model file NOT found in container"
+          fi
+        else
+          echo "⚠️  Cannot access model directory in container"
+        fi
+        
         # Health check function
         check_service() {
           local service_name=$1
@@ -268,6 +293,16 @@ jobs:
         echo "Performing health checks..."
         check_service "FastAPI" "http://localhost:8000/"
         check_service "Frontend" "http://localhost:3000/"
+        
+        # Test model availability via debug endpoint
+        echo "Testing model availability..."
+        if curl -f http://localhost:8000/debug/model > /dev/null 2>&1; then
+          echo "✅ Model debug endpoint accessible"
+          echo "Model info:"
+          curl -s http://localhost:8000/debug/model | python3 -m json.tool 2>/dev/null || curl -s http://localhost:8000/debug/model
+        else
+          echo "❌ Model debug endpoint not accessible"
+        fi
         
         # Backend health check
         echo "Checking Spring Boot backend..."

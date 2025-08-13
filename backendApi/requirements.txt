@@ -1,3 +1,6 @@
+# FastAPI ML Service Requirements
+# For PyTorch CPU installation, use: pip install -r requirements.txt --index-url https://download.pytorch.org/whl/cpu
+
 # FastAPI requirements
 fastapi==0.116.1
 uvicorn[standard]==0.35.0
@@ -8,8 +11,9 @@ requests==2.32.4
 numpy==2.3.1
 pandas==2.3.1
 scikit-learn==1.7.1
---index-url https://download.pytorch.org/whl/cpu
-torch
+torch==2.7.1+cpu
+torchvision==0.20.1+cpu
+torchaudio==2.7.1+cpu
 scipy==1.16.0
 
 # Additional dependencies
