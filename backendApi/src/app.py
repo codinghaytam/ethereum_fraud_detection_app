@@ -37,7 +37,7 @@ async def process_addresses(address: str):
     try:
             # Use absolute path resolution for model directory
             script_dir = os.path.dirname(os.path.abspath(__file__))
-            model_dir = os.path.join(script_dir, '..', 'model')+'/'
+            model_dir = os.path.join(script_dir, '..', 'model')+'/address_fraud_classifier_lstm.pth'
 
             # Fallback to relative path if absolute doesn't work
             
