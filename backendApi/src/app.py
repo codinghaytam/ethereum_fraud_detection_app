@@ -38,12 +38,13 @@ async def process_addresses(address: str):
             # Use absolute path resolution for model directory
             script_dir = os.path.dirname(os.path.abspath(__file__))
             model_dir = os.path.join(script_dir, '..', 'model')+'/'
-            
+
             # Fallback to relative path if absolute doesn't work
             
             prediction = predict_address_fraud(
                 ethereum_address=address,
                 etherscan_api_key=ETHERSCAN_API_KEY,
+                model_path=model_dir
             )
             return prediction
     except requests.RequestException as e:
