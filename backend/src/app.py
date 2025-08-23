@@ -12,13 +12,7 @@ import pandas as pd
 from src.FraudTransactionDetector import detect_fraud
 from fastapi.middleware.cors import CORSMiddleware
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://3.142.201.165:3000"],  # Specify the exact frontend origin
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)   
+   
 # Load environment variables early
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../.env'))
 
@@ -30,7 +24,13 @@ from src.modelLoader import predict_address_fraud
 
 
 app = FastAPI()
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://3.142.201.165:3000"],  # Specify the exact frontend origin
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # Get Etherscan API key from environment variable
 ETHERSCAN_API_KEY = os.getenv("ETHERSCAN_API_KEY")
 
