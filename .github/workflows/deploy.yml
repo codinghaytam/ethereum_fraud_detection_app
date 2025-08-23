@@ -52,11 +52,11 @@ jobs:
             --exclude='*.log' \
             --exclude='data' \
             --exclude='data/' \
-            --exclude='cosmoscan-eth-main/node_modules' \
-            --exclude='cosmoscan-eth-main/dist' \
+            --exclude='frontend/node_modules' \
+            --exclude='frontend/dist' \
             --exclude='backend/target' \
-            --exclude='backendApi/__pycache__' \
-            --exclude='backendApi/apiEnv' \
+            --exclude='backend/__pycache__' \
+            --exclude='backend/apiEnv' \
             --exclude='training-env' \
             --exclude='**/.DS_Store' \
             --exclude='**/npm-debug.log*' \
@@ -73,11 +73,11 @@ jobs:
                   --exclude='*.log' \
                   --exclude='data' \
                   --exclude='data/' \
-                  --exclude='cosmoscan-eth-main/node_modules' \
-                  --exclude='cosmoscan-eth-main/dist' \
+                  --exclude='frontend/node_modules' \
+                  --exclude='frontend/dist' \
                   --exclude='backend/target' \
-                  --exclude='backendApi/__pycache__' \
-                  --exclude='backendApi/apiEnv' \
+                  --exclude='backend/__pycache__' \
+                  --exclude='backend/apiEnv' \
                   --exclude='training-env' \
                   --exclude='**/.DS_Store' \
                   --exclude='**/npm-debug.log*' \
@@ -98,17 +98,17 @@ jobs:
           # Verify model files are included
           echo "Verifying model files are included..."
           echo "Looking for model files in deployment package:"
-          tar -tzf deployment.tar.gz | grep -E "backendApi/model/" | head -10
+          tar -tzf deployment.tar.gz | grep -E "backend/model/" | head -10
           
           # Specifically check for the new LSTM model
-          if tar -tzf deployment.tar.gz | grep -q "backendApi/model/address_fraud_classifier_lstm.pth"; then
+          if tar -tzf deployment.tar.gz | grep -q "backend/model/address_fraud_classifier_lstm.pth"; then
             echo "✅ New LSTM model file found in deployment package"
           else
             echo "❌ Warning: New LSTM model file NOT found in deployment package"
           fi
           
           # Check for any model files
-          model_count=$(tar -tzf deployment.tar.gz | grep -E "backendApi/model/.*\.(pth|pkl)$" | wc -l)
+          model_count=$(tar -tzf deployment.tar.gz | grep -E "backend/model/.*\.(pth|pkl)$" | wc -l)
           echo "Total model files found: $model_count"
         else
           echo "Failed to create deployment package"
@@ -168,8 +168,8 @@ jobs:
         
         # Create FastAPI environment file
         echo "Creating FastAPI environment configuration..."
-        mkdir -p ./backendApi
-        cat > ./backendApi/.env << 'FASTAPI_ENV'
+        mkdir -p ./backend
+        cat > ./backend/.env << 'FASTAPI_ENV'
         ETHERSCAN_API_KEY=${{ secrets.ETHERSCAN_API_KEY }}
         DEBUG=false
         LOG_LEVEL=INFO
@@ -179,8 +179,8 @@ jobs:
         
         # Create frontend environment variables
         echo "Creating frontend environment configuration..."
-        mkdir -p ./cosmoscan-eth-main
-        cat > ./cosmoscan-eth-main/.env << 'FRONTEND_ENV'
+        mkdir -p ./frontend
+        cat > ./frontend/.env << 'FRONTEND_ENV'
         VITE_API_URL=http://${{ secrets.EC2_HOST }}:8000
         VITE_BACKEND_URL=http://${{ secrets.EC2_HOST }}:8080
         FRONTEND_ENV
