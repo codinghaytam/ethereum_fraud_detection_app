@@ -89,7 +89,7 @@ function App() {
           <div className="flex items-center gap-4">
             <Button  variant="outline" size="sm" className="backdrop-blur border-white/15 bg-background/30">
               <CodeXml/>
-              <a href="/api" target="_blank" rel="noreferrer">API</a>
+              <a href="http://3.142.201.165:8000/docs" target="_blank" rel="noreferrer">API</a>
             </Button>
           </div>
         </div>
