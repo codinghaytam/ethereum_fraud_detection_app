@@ -4,12 +4,16 @@ import joblib
 import requests
 from datetime import datetime
 from sklearn.preprocessing import Normalizer
+import os
 
 class SimpleFraudDetector:
     """Simple Ethereum Fraud Detector"""
     
     def __init__(self,transactions):
-        self.model = joblib.load("../model/gradient_boosting_model_random_tree.pkl")
+        # Use absolute path resolution for model directory
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        model_dir = os.path.join(script_dir, '..', 'model')+'/gradient_boosting_model_random_tree.pkl'
+        self.model = joblib.load(model_dir)
         self.normalizer = Normalizer()
         self.transactions= transactions
     
