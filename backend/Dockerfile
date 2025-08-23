@@ -17,6 +17,7 @@ ENV MKL_NUM_THREADS=1
 ENV PYTHONUNBUFFERED=1
 ENV NUMPY_EXPERIMENTAL_ARRAY_FUNCTION=0
 ENV OMP_NUM_THREADS=1
+ENV PYTHONPATH=/app:/app/src
 
 # Copy requirements first for better caching
 COPY requirements.txt .
@@ -25,10 +26,8 @@ COPY requirements.txt .
 RUN pip install --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r requirements.txt
 
-
 # Copy source code and startup script
 COPY . .
-
 
 # Create non-root user
 RUN useradd -m -u 1001 appuser && chown -R appuser:appuser /app
@@ -37,4 +36,4 @@ USER appuser
 EXPOSE 8000
 
 # Use startup script instead of direct uvicorn
-CMD ["python", "src/app.py"]
+CMD ["python", "-m", "uvicorn", "src.app:app", "--host", "0.0.0.0", "--port", "8000"]

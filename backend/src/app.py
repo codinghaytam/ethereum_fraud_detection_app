@@ -10,17 +10,14 @@ from fastapi.testclient import TestClient
 import numpy as np
 import pandas as pd
 import torch
-from FraudTransactionDetector import detect_fraud
+from src.FraudTransactionDetector import detect_fraud
 
 # Load environment variables early
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../.env'))
 
-# Add the parent directory to Python path to find modelLoader
-sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
-
 # Import after setting up environment and path
 import requests
-from modelLoader import predict_address_fraud
+from src.modelLoader import predict_address_fraud
 
 # Load model using the new generic approach
 
