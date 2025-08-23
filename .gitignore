@@ -75,3 +75,4 @@ processed_*.npy
 *.log
 
 .vscode
+new_model

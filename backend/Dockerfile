@@ -1,37 +1,40 @@
-# Spring Boot Backend Dockerfile
-FROM maven:3.9.6-eclipse-temurin-21 as builder
+# FastAPI ML Service Dockerfile
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Accept build arguments
-ARG SPRING_PROFILES_ACTIVE=docker
+# Install system dependencies including curl for health checks
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    curl \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy pom.xml
-COPY pom.xml .
+# Set environment variables to avoid NumPy issues
+ENV OPENBLAS_NUM_THREADS=1
+ENV MKL_NUM_THREADS=1
+ENV PYTHONUNBUFFERED=1
+ENV NUMPY_EXPERIMENTAL_ARRAY_FUNCTION=0
+ENV OMP_NUM_THREADS=1
 
-# Download dependencies
-RUN mvn dependency:go-offline -B
+# Copy requirements first for better caching
+COPY requirements.txt .
 
-# Copy source code
-COPY src ./src
+# Upgrade pip and install dependencies
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r requirements.txt
 
-# Build the application
-RUN mvn clean package -DskipTests -Dspring.profiles.active=$SPRING_PROFILES_ACTIVE
 
-# Production stage
-FROM eclipse-temurin:21-jre-alpine
+# Copy source code and startup script
+COPY . .
 
-WORKDIR /app
-
-# Copy the built jar
-COPY --from=builder /app/target/*.jar app.jar
 
 # Create non-root user
-RUN addgroup -g 1001 -S appgroup && \
-    adduser -u 1001 -S appuser -G appgroup
-
+RUN useradd -m -u 1001 appuser && chown -R appuser:appuser /app
 USER appuser
 
-EXPOSE 8080
+EXPOSE 8000
 
-ENTRYPOINT ["java", "-jar", "app.jar", "--spring.profiles.active=docker"]
+# Use startup script instead of direct uvicorn
+CMD ["python", "src/app.py"]

@@ -3,12 +3,10 @@ services:
   # React Frontend
   frontend:
     build:
-      context: ./cosmoscan-eth-main
+      context: ./frontend
       dockerfile: Dockerfile
       args:
         - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
-        - VITE_BACKEND_URL=${VITE_BACKEND_URL:-http://localhost:8080}
-    platform: linux/amd64
     container_name: eth-frontend
     ports:
       - "${FRONTEND_PORT:-3000}:80"
@@ -17,54 +15,28 @@ services:
         ipv4_address: 172.18.0.3
 
     depends_on:
-      - fastapi
       - backend
-    restart: unless-stopped
-
-  # Spring Boot Backend
-  backend:
-    image: maven:3.9.6-eclipse-temurin-21
-    container_name: eth-backend
-    working_dir: /app
-    volumes:
-      - ./backend:/app
-    command: mvn spring-boot:run -Dspring-boot.run.profiles=docker
-    ports:
-      - "${BACKEND_PORT:-8080}:8080"
-    environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - MISTRAL_AI_API_KEY=${MISTRAL_AI_API_KEY}
-      - ETHERSCAN_API_KEY=${ETHERSCAN_API_KEY}
-    env_file:
-      - .env
-    networks:
-      ethereum-fraud-detection:
-        ipv4_address: 172.18.0.4
-    depends_on:
-      - fastapi
-    restart: unless-stopped
 
   # FastAPI ML Service
-  fastapi:
+  backend:
     build:
-      context: ./backendApi
+      context: ./backend
       dockerfile: Dockerfile
       args:
         - PYTHONPATH=/app
-    container_name: eth-fastapi
+    container_name: eth-backend
     ports:
       - "${FASTAPI_PORT:-8000}:8000"
     environment:
       - PYTHONPATH=/app
       - MODEL_DIR=${MODEL_DIR:-/app/model}
     env_file:
-      - ./backendApi/.env
+      - ./backend/.env
     volumes:
-      - ./backendApi/model:/app/model:ro
+      - ./backend/model:/app/model:ro
     networks:
       ethereum-fraud-detection:
         ipv4_address: 172.18.0.2
-    restart: unless-stopped
 
 networks:
   ethereum-fraud-detection:

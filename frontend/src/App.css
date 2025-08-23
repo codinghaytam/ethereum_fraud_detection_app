@@ -1,0 +1,98 @@
+#root {
+  margin: 0 auto;
+  text-align: center;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
+
+
+.aurora-container {
+  width: 100%;
+  height: 100%;
+  position: fixed;   /* fill viewport regardless of scroll */
+  inset: 0;          /* top:0; right:0; bottom:0; left:0 */
+  z-index: 0;        /* keep behind content */
+  pointer-events: none; /* don't block input */
+}
+
+/* Ensure app content stacks above the background */
+.app-root,
+.nav-bar,
+header,
+.hero,
+main,
+footer {
+  position: relative;
+  z-index: 1;
+}
+
+/* Transparent blurred topbar */
+.nav-bar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  background: rgba(255,255,255,0.04); /* slight tint so content shows through */
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.nav-inner { height: 64px; }
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  .nav-bar { backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+
+/* Subtle fade-up for results */
+.result-animate {
+  animation: fadeUp 500ms ease-out both;
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.darkveil-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  position: fixed;   /* fill viewport regardless of scroll */
+  inset: 0;          /* top:0; right:0; bottom:0; left:0 */
+  z-index: 0;        /* keep behind content */
+  pointer-events: none;
+}
