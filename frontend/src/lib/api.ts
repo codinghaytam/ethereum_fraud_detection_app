@@ -18,7 +18,7 @@ const API_URL = import.meta.env.VITE_API_URL as string | undefined
 
 
 export async function fetchAnalysis(address: string, init?: RequestInit): Promise<BackendResponse> {
-  const base = API_URL ?? 'http://localhost:8000/api/processAdress'
+  const base = API_URL ?? 'http://3.142.201.165:8000/api/processAdress'
   const url = `${base}?address=${encodeURIComponent(address)}`
   const res = await fetch(url, {
     method: 'Post',
