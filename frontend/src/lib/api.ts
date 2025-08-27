@@ -21,7 +21,7 @@ export type AnalysisWarn = { ok: false; warning: string }
 export type AnalysisApiResponse = AnalysisOk | AnalysisWarn
 
 export async function fetchAnalysis(address: string, init?: RequestInit): Promise<AnalysisApiResponse> {
-  const base = API_URL ?? 'http://localhost:8000/api/processAdress'
+  const base = API_URL ?? 'http://3.142.201.165:8000/api/processAdress'
   const url = `${base}?address=${encodeURIComponent(address)}`
     try {
       const res = await fetch(url, {
