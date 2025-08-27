@@ -7,7 +7,7 @@ import { Globe, Shield, ArrowRight, Loader2,CodeXml } from 'lucide-react'
 import { AnalysisResult } from './components/AnalysisResult'
 import { Toaster } from './components/ui/toaster'
 import { toast } from 'sonner'
-import { fetchAnalysis, type BackendResponse } from './lib/api'
+import { fetchAnalysis, type BackendResponse, type AnalysisApiResponse } from './lib/api'
 import DarkVeil from './components/DarkVeil';
 
   
@@ -20,6 +20,8 @@ export type AnalysisData = {
   riskLevel: 'LOW RISK' | 'MEDIUM RISK' | 'HIGH RISK'
   addresses: string[]
   transactions: BackendResponse['fraudulent_transactions']
+  warning?: string
+  numTransactions: number
 }
 
 // Simple, editable defaults (do not hard-code analysis logic here)
@@ -43,17 +45,35 @@ function App() {
     }
     try {
       setAnalyzing(true)
-      const data = await fetchAnalysis(address)
-      const probability = Math.round((data.is_fraud ? data.confidence : (1 - data.confidence)) * 100)
-      const confidencePct = Math.round(data.confidence * 100)
+    const apiRes: AnalysisApiResponse = await fetchAnalysis(address)
+    console.log('API response:', apiRes)
+    if (!apiRes.ok) {
+        const mapped: AnalysisData = {
+          address,
+          fraudProbability: 0,
+          confidence: 0,
+          riskLevel: 'LOW RISK',
+          addresses: [],
+          transactions: [],
+      warning: apiRes.warning,
+      numTransactions: 0,
+        }
+        setResult(mapped)
+        return
+      }
+    const data = apiRes.data
+    // Probability reflects fraud likelihood: if flagged as fraud, use confidence%; otherwise 0%
+    const confidencePct = Math.round((data.confidence ?? 0) * 100)
+    const probability = data.is_fraud ? confidencePct : 0
       const risk: AnalysisData['riskLevel'] = probability >= 75 ? 'HIGH RISK' : probability >= 35 ? 'MEDIUM RISK' : 'LOW RISK'
       const mapped: AnalysisData = {
         address,
         fraudProbability: probability,
         confidence: confidencePct,
         riskLevel: risk,
-        addresses: data.addresses_involved,
-        transactions: data.fraudulent_transactions,
+        addresses: Array.isArray(data.addresses_involved) ? data.addresses_involved : [],
+        transactions: Array.isArray(data.fraudulent_transactions) ? data.fraudulent_transactions : [],
+  numTransactions: typeof data.num_transactions === 'number' ? data.num_transactions : (Array.isArray(data.fraudulent_transactions) ? data.fraudulent_transactions.length : 0),
       }
       setResult(mapped)
     } catch (err) {

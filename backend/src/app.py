@@ -57,7 +57,7 @@ def fetch_transactions_from_etherscan(address: str, api_key: str = None):
         'action': 'txlist',
         'address': address,
         'startblock': 0,
-        'endblock': 99999999,
+        'endblock': 99999999999,
         'sort': 'asc',
         'offset': 1000,  # Limit to 1000 transactions
         'page': 1,
@@ -94,6 +94,8 @@ async def process_addresses(address: str):
             # Fetch transactions from Etherscan
             transactions = fetch_transactions_from_etherscan(address, ETHERSCAN_API_KEY)
             
+            if (len(transactions) == 0):
+                raise HTTPException(status_code=404, detail="No transactions found for the given address")
             # Get fraud transaction analysis
             fraud_transactions = detect_fraud(
                 address=address,
