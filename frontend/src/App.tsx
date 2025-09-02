@@ -10,7 +10,7 @@ import { toast } from 'sonner'
 import { fetchAnalysis, type BackendResponse } from './lib/api'
 import DarkVeil from './components/DarkVeil';
 
-  
+
 
 
 export type AnalysisData = {
@@ -20,6 +20,8 @@ export type AnalysisData = {
   riskLevel: 'LOW RISK' | 'MEDIUM RISK' | 'HIGH RISK'
   addresses: string[]
   transactions: BackendResponse['fraudulent_transactions']
+  // Link to backend prediction for feedback
+  predictionId?: string
 }
 
 // Simple, editable defaults (do not hard-code analysis logic here)
@@ -54,6 +56,7 @@ function App() {
         riskLevel: risk,
         addresses: data.addresses_involved,
         transactions: data.fraudulent_transactions,
+        predictionId: data.prediction_id,
       }
       setResult(mapped)
     } catch (err) {
@@ -94,10 +97,10 @@ function App() {
           </div>
         </div>
       </nav>
-      
+
       {/* Hero */}
       <header className="w-full">
-        
+
         <div className="hero max-w-4xl mx-auto px-6 py-20 text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-card/40 px-3 py-1 text-xs text-muted-foreground backdrop-blur">
             <Shield className="h-3.5 w-3.5 text-primary" />
@@ -123,7 +126,7 @@ function App() {
                     onChange={(e) => setAddress((e.target as HTMLInputElement).value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleAnalyze()}
                     placeholder={DEFAULTS.placeholderAddress}
-                    className="flex-1 bg-sidebar border-2 focus-visible:ring-0 px-3 py-2 border-sidebar-accent/30 hover:border-sidebar-accent focus:border-sidebar-accent"
+                    className="flex-1 bg-sidebar border-2 focus-visible:ring-0 px-3 py-2 border-sidebar-accent/30 hover:border-sidebar-accent focus:border-sidebar-accent placeholder:text-muted-foreground/50"
                   />
                 <Button size="lg" onClick={handleAnalyze} disabled={analyzing} aria-busy={analyzing} className="shrink-0 group min-w-28">
                   {analyzing ? (
@@ -136,7 +139,7 @@ function App() {
                   )}
                 </Button>
               </div>
-              
+
             </CardContent>
           </Card>
         </div>

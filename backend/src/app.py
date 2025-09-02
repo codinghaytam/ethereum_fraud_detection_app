@@ -21,7 +21,13 @@ from src.db import (
     invalidate_prediction_cache,
     get_cached_transactions,
     cache_transaction_data,
-    get_cache_stats
+    get_cache_stats,
+    # new imports for reporting
+    define_prediction_reports_table,
+    insert_prediction_report,
+    get_reports_for_prediction,
+    get_report_stats_for_prediction,
+    get_prediction_by_id,
 )
 
 
@@ -38,7 +44,13 @@ import requests
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://3.142.201.165:3000"],  # Specify the exact frontend origin
+    allow_origins=[
+        "http://3.142.201.165:3000",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -256,6 +268,61 @@ async def refresh_address_cache(address: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error refreshing cache: {e}")
 
+@app.on_event("startup")
+async def startup_init():
+    # Ensure required tables exist
+    try:
+        define_prediction_table()
+        define_prediction_reports_table()
+    except Exception as e:
+        # Log but don't crash startup; endpoints will raise proper errors later
+        print(f"Startup init error: {e}")
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
+class ReportRequest(BaseModel):
+    prediction_id: str
+    user_id: str
+    is_valid: bool
+    note: str | None = None
+
+@app.post("/api/reports")
+async def submit_report(report: ReportRequest):
+    try:
+        # Validate prediction exists
+        pred = get_prediction_by_id(report.prediction_id)
+        if not pred:
+            raise HTTPException(status_code=404, detail="Prediction not found")
+
+        report_id = insert_prediction_report(
+            prediction_id=report.prediction_id,
+            user_id=report.user_id,
+            is_valid=report.is_valid,
+            note=report.note,
+        )
+        stats = get_report_stats_for_prediction(report.prediction_id)
+        return {"report_id": report_id, "stats": stats}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error submitting report: {e}")
+
+@app.get("/api/reports/{prediction_id}")
+async def get_reports(prediction_id: str):
+    try:
+        # Validate prediction exists
+        pred = get_prediction_by_id(prediction_id)
+        if not pred:
+            raise HTTPException(status_code=404, detail="Prediction not found")
+
+        stats = get_report_stats_for_prediction(prediction_id)
+        reports = get_reports_for_prediction(prediction_id)
+        return {"prediction_id": prediction_id, "stats": stats, "reports": reports}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching reports: {e}")
 
 client = TestClient(app)
 

@@ -196,8 +196,9 @@ def insert_prediction(prediction):
     conn.commit()
     conn.close()
 
-    # Cache the prediction result
-    cache_prediction_result(prediction.get('address'), prediction)
+    # Cache the prediction result (ensure prediction_id is present in cached payload)
+    prediction_to_cache = { **prediction, 'prediction_id': prediction_id }
+    cache_prediction_result(prediction.get('address'), prediction_to_cache)
 
     return prediction_id
 
@@ -235,9 +236,10 @@ def update_prediction(prediction_id, prediction):
     conn.commit()
     conn.close()
 
-    # Update cache if update was successful
+    # Update cache if update was successful (ensure prediction_id is present)
     if rows_affected > 0:
-        cache_prediction_result(prediction.get('address'), prediction)
+        prediction_to_cache = { **prediction, 'prediction_id': prediction_id }
+        cache_prediction_result(prediction.get('address'), prediction_to_cache)
 
     return rows_affected > 0
 
@@ -270,6 +272,34 @@ def get_prediction_by_address(address):
         }
     return None
 
+def get_prediction_by_id(prediction_id: str):
+    conn = db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT id, address, confidence, is_fraud, addresses_involved,
+               fraudulent_transactions, created_at, updated_at
+        FROM predictions
+        WHERE id = %s
+        LIMIT 1
+        """,
+        (prediction_id,),
+    )
+    result = cursor.fetchone()
+    conn.close()
+    if result:
+        return {
+            'id': result[0],
+            'address': result[1],
+            'confidence': result[2],
+            'is_fraud': result[3],
+            'addresses_involved': result[4],
+            'fraudulent_transactions': json.loads(result[5]) if result[5] else [],
+            'created_at': result[6],
+            'updated_at': result[7],
+        }
+    return None
+
 def get_all_predictions():
     conn = db_connection()
     cursor = conn.cursor()
@@ -298,3 +328,101 @@ def get_all_predictions():
         })
 
     return predictions
+
+def define_prediction_reports_table():
+    conn = db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS prediction_reports (
+        id VARCHAR(255) PRIMARY KEY,
+        prediction_id VARCHAR(255) NOT NULL REFERENCES predictions(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL,
+        is_valid BOOLEAN NOT NULL,
+        note TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (prediction_id, user_id)
+    )
+    ''')
+    conn.commit()
+    conn.close()
+
+
+def insert_prediction_report(prediction_id: str, user_id: str, is_valid: bool, note: str = None) -> str:
+    """Create or update a user's report for a prediction. Returns report row id."""
+    conn = db_connection()
+    cursor = conn.cursor()
+    report_id = str(uuid.uuid4())
+    cursor.execute(
+        '''
+        INSERT INTO prediction_reports (id, prediction_id, user_id, is_valid, note, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        ON CONFLICT (prediction_id, user_id)
+        DO UPDATE SET is_valid = EXCLUDED.is_valid, note = EXCLUDED.note, created_at = EXCLUDED.created_at
+        RETURNING id
+        ''',
+        (
+            report_id,
+            prediction_id,
+            user_id,
+            is_valid,
+            note,
+            datetime.now(),
+        ),
+    )
+    upserted_id = cursor.fetchone()[0]
+    conn.commit()
+    conn.close()
+    return upserted_id
+
+
+def get_reports_for_prediction(prediction_id: str):
+    """Return all reports for a prediction (without PII filtering)."""
+    conn = db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        '''
+        SELECT user_id, is_valid, note, created_at
+        FROM prediction_reports
+        WHERE prediction_id = %s
+        ORDER BY created_at DESC
+        ''',
+        (prediction_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        {
+            'user_id': r[0],
+            'is_valid': r[1],
+            'note': r[2],
+            'created_at': r[3].isoformat() if r[3] else None,
+        }
+        for r in rows
+    ]
+
+
+def get_report_stats_for_prediction(prediction_id: str):
+    """Return aggregated counts of valid/invalid reports for a prediction."""
+    conn = db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        '''
+        SELECT
+            COALESCE(SUM(CASE WHEN is_valid THEN 1 ELSE 0 END), 0) AS valid_count,
+            COALESCE(SUM(CASE WHEN NOT is_valid THEN 1 ELSE 0 END), 0) AS invalid_count,
+            COUNT(*) AS total_count
+        FROM prediction_reports
+        WHERE prediction_id = %s
+        ''',
+        (prediction_id,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    valid_count = row[0] if row and row[0] is not None else 0
+    invalid_count = row[1] if row and row[1] is not None else 0
+    total_count = row[2] if row and row[2] is not None else 0
+    return {
+        'valid_count': int(valid_count),
+        'invalid_count': int(invalid_count),
+        'total_count': int(total_count),
+    }
