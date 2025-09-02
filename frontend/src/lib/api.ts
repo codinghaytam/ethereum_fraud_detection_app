@@ -18,7 +18,7 @@ export type BackendResponse = {
 const API_URL = import.meta.env.VITE_API_URL as string | undefined
 
 // Derive API host (origin) from the process endpoint URL
-const DEFAULT_PROCESS_URL = 'http://localhost:8000/api/processAdress'
+const DEFAULT_PROCESS_URL = 'http://3.142.201.165:8000/api/processAdress'
 const PROCESS_URL = API_URL ?? DEFAULT_PROCESS_URL
 const API_HOST = new URL(PROCESS_URL).origin
 
