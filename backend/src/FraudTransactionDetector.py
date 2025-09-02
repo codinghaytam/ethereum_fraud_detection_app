@@ -90,7 +90,7 @@ class SimpleFraudDetector:
                     'confidence': float(fraud_confidence),
                     'transaction_hash': tx.get('hash', ''),
                     'transaction_type': tx_type,
-                    'addresses_involved': [tx['from'], tx['to']] if 'from' in tx and 'to' in tx else []
+                    'addresses_involved': [tx['from'], tx['to']] if 'from' in tx and 'to' in tx else [],
                 })
                 
             except Exception as e:
@@ -125,7 +125,9 @@ class SimpleFraudDetector:
             'fraudulent_transactions': high_confidence_fraud,
             'confidence': confidence,
             'is_fraud': is_fraud,
-            'addresses_involved': addresses_involved
+            'addresses_involved': addresses_involved,
+            'num_transactions': len(transactions)
+
         }
 
 
