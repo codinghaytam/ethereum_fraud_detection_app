@@ -19,6 +19,9 @@ ENV NUMPY_EXPERIMENTAL_ARRAY_FUNCTION=0
 ENV OMP_NUM_THREADS=1
 ENV PYTHONPATH=/app:/app/src
 
+# Declare expected runtime env vars (values provided via docker-compose env_file)
+ENV ETHERSCAN_API_KEY=""
+ENV PG_PASSWORD=""
 
 # Copy requirements first for better caching
 COPY requirements.txt .

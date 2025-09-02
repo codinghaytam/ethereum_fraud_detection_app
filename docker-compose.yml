@@ -36,9 +36,14 @@ services:
     networks:
       ethereum-fraud-detection:
         ipv4_address: 172.18.0.2
+    depends_on:
+      - db
+      - redis
 
   db:
     image: postgres
+    env_file:
+      - ./backend/.env
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${PG_PASSWORD}

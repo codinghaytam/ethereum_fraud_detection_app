@@ -14,7 +14,8 @@ CACHE_EXPIRATION = 3600  # 1 hour in seconds
 CACHE_PREFIX = "fraud_detection:"
 
 def create_cache_connection():
-    return redis.Redis(host='localhost', port=6379, db=0)
+    # Connect to redis service in docker network
+    return redis.Redis(host='redis', port=6379, db=0)
 
 def set_value_in_cache(key, value):
     cache = create_cache_connection()
@@ -129,14 +130,16 @@ def get_cache_stats():
         return {'error': str(e)}
 
 def db_connection():
-    conn=psycopg2.connect(
-        host='localhost',
+    # Connect to postgres service in docker network; only secret required is PG_PASSWORD
+    conn = psycopg2.connect(
+        host='db',
         port=5432,
         database='mydb',
         user='postgres',
         password=os.getenv('PG_PASSWORD')
     )
     return conn
+
 def define_prediction_table():
     conn=db_connection()
     cursor = conn.cursor()

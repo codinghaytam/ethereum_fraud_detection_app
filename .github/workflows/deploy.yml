@@ -166,15 +166,12 @@ jobs:
           sudo chmod +x /usr/local/bin/docker-compose
         fi
         
-        # Create FastAPI environment file
+        # Create FastAPI environment file - only required vars from secrets
         echo "Creating FastAPI environment configuration..."
         mkdir -p ./backend
         cat > ./backend/.env << 'FASTAPI_ENV'
         ETHERSCAN_API_KEY=${{ secrets.ETHERSCAN_API_KEY }}
-        DEBUG=false
-        LOG_LEVEL=INFO
-        MODEL_DIR=/app/model
-        PYTHONPATH=/app
+        PG_PASSWORD=${{ secrets.PG_PASSWORD }}
         FASTAPI_ENV
         
         # Create frontend environment variables
@@ -220,7 +217,7 @@ jobs:
         app.fastapi.url=http://fastapi:8000
         BACKEND_ENV
         
-        # Create Docker Compose environment file
+        # Create Docker Compose environment file (adds PG_PASSWORD so Postgres gets it)
         cat > .env << 'DOCKER_ENV'
         # Service ports
         FRONTEND_PORT=3000
@@ -234,9 +231,10 @@ jobs:
         # Spring profiles
         SPRING_PROFILES_ACTIVE=docker
         
-        # API Keys (these will be passed from environment variables)
+        # API Keys / Secrets
         ETHERSCAN_API_KEY=${{ secrets.ETHERSCAN_API_KEY }}
         MISTRAL_AI_API_KEY=${{ secrets.MISTRAL_AI_API_KEY }}
+        PG_PASSWORD=${{ secrets.PG_PASSWORD }}
         
         # Model directory
         MODEL_DIR=/app/model
