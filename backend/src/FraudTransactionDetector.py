@@ -55,7 +55,7 @@ class SimpleFraudDetector:
         transactions = self.transactions
         if not transactions:
             return []
-        
+
         
         # Analyze each transaction and collect fraud predictions
         transaction_predictions = []
@@ -120,7 +120,7 @@ class SimpleFraudDetector:
             confidence = 0.0
             is_fraud = False
             addresses_involved=set()
-        
+
         return {
             'fraudulent_transactions': high_confidence_fraud,
             'confidence': confidence,

@@ -19,6 +19,7 @@ ENV NUMPY_EXPERIMENTAL_ARRAY_FUNCTION=0
 ENV OMP_NUM_THREADS=1
 ENV PYTHONPATH=/app:/app/src
 
+
 # Copy requirements first for better caching
 COPY requirements.txt .
 
