@@ -246,6 +246,25 @@ def update_prediction(prediction_id, prediction):
 
     return rows_affected > 0
 
+def _parse_json_field(value, default=None):
+    """Safely parse a JSON/JSONB field regardless of driver return type.
+    - If value is str, parse with json.loads.
+    - If value is list/dict, return as-is.
+    - None -> default (list by default).
+    """
+    if default is None:
+        default = []
+    if value is None:
+        return default
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except Exception:
+            return default
+    if isinstance(value, (list, dict)):
+        return value
+    return default
+
 def get_prediction_by_address(address):
     conn = db_connection()
     cursor = conn.cursor()
@@ -269,7 +288,7 @@ def get_prediction_by_address(address):
             'confidence': result[2],
             'is_fraud': result[3],
             'addresses_involved': result[4],
-            'fraudulent_transactions': json.loads(result[5]) if result[5] else [],
+            'fraudulent_transactions': _parse_json_field(result[5], []),
             'created_at': result[6],
             'updated_at': result[7]
         }
@@ -297,7 +316,7 @@ def get_prediction_by_id(prediction_id: str):
             'confidence': result[2],
             'is_fraud': result[3],
             'addresses_involved': result[4],
-            'fraudulent_transactions': json.loads(result[5]) if result[5] else [],
+            'fraudulent_transactions': _parse_json_field(result[5], []),
             'created_at': result[6],
             'updated_at': result[7],
         }
@@ -325,7 +344,7 @@ def get_all_predictions():
             'confidence': result[2],
             'is_fraud': result[3],
             'addresses_involved': result[4],
-            'fraudulent_transactions': json.loads(result[5]) if result[5] else [],
+            'fraudulent_transactions': _parse_json_field(result[5], []),
             'created_at': result[6],
             'updated_at': result[7]
         })
