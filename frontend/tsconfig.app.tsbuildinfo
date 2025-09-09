@@ -1,1 +1,1 @@
-{"root":["./src/App.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/ui/button.tsx","./src/lib/utils.ts"],"version":"5.8.3"}
+{"root":["./src/App.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/AnalysisResult.tsx","./src/components/Aroura.tsx","./src/components/DarkVeil.tsx","./src/components/ui/badge.tsx","./src/components/ui/button.tsx","./src/components/ui/card.tsx","./src/components/ui/input.tsx","./src/components/ui/progress.tsx","./src/components/ui/toaster.tsx","./src/lib/api.ts","./src/lib/utils.ts"],"version":"5.8.3"}
