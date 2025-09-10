@@ -1,4 +1,3 @@
-
 services:
   # React Frontend
   frontend:
@@ -37,6 +36,32 @@ services:
     networks:
       ethereum-fraud-detection:
         ipv4_address: 172.18.0.2
+    depends_on:
+      - db
+      - redis
+
+  db:
+    image: postgres
+    env_file:
+      - ./backend/.env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-mydb}
+    volumes:
+      - ./data:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+    networks:
+      ethereum-fraud-detection:
+        ipv4_address: 172.18.0.4
+  redis:
+    image: redis
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    ports:
+      - 6379:6379
 
 networks:
   ethereum-fraud-detection:

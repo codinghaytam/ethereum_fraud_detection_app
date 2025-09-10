@@ -11,61 +11,71 @@ export type BackendResponse = {
   confidence: number // 0..1
   is_fraud: boolean
   addresses_involved: string[]
-  num_transactions: number
+  // populated by backend processAdress endpoint; optional for type safety
+  prediction_id?: string
 }
 
 const API_URL = import.meta.env.VITE_API_URL as string | undefined
 
-export type AnalysisOk = { ok: true; data: BackendResponse }
-export type AnalysisWarn = { ok: false; warning: string }
-export type AnalysisApiResponse = AnalysisOk | AnalysisWarn
+// Derive API host (origin) from the process endpoint URL
+const DEFAULT_PROCESS_URL = 'http://3.142.201.165:8000/api/processAdress'
+const PROCESS_URL = API_URL ?? DEFAULT_PROCESS_URL
+const API_HOST = new URL(PROCESS_URL).origin
 
-export async function fetchAnalysis(address: string, init?: RequestInit): Promise<AnalysisApiResponse> {
-  const base = API_URL ?? 'http://3.142.201.165:8000/api/processAdress'
-  const url = `${base}?address=${encodeURIComponent(address)}`
-    try {
-      const res = await fetch(url, {
-        method: 'Post',
-        headers: { 'Accept': 'application/json' },
-        ...init,
-      })
+export async function fetchAnalysis(address: string, init?: RequestInit): Promise<BackendResponse> {
+  const url = `${PROCESS_URL}?address=${encodeURIComponent(address)}`
+  const res = await fetch(url, {
+    method: 'Post',
+    headers: { 'Accept': 'application/json' },
+    ...init,
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`API ${res.status}: ${text || res.statusText}`)
+  }
+  const data = (await res.json()) as BackendResponse
+  return data
+}
 
-      // Read the body once and branch on content
-      const text = await res.text().catch(() => '')
-      let json: unknown = null
-      try { json = text ? JSON.parse(text) : null } catch { json = null }
+export type ReportStats = { valid_count: number; invalid_count: number; total_count: number }
+export type ReportItem = { user_id: string; is_valid: boolean; note?: string | null; created_at?: string | null }
 
-      // Extract warning or detail when present
-      const extractWarning = (j: unknown): string | undefined => {
-        if (j && typeof j === 'object') {
-          const obj = j as { [k: string]: unknown }
-          if (typeof obj.warning === 'string') return obj.warning
-          if (typeof obj.detail === 'string') return obj.detail
-        }
-        return undefined
-      }
+export async function submitReport(params: { prediction_id: string; user_id: string; is_valid: boolean; note?: string }): Promise<{ report_id: string; stats: ReportStats }>{
+  const res = await fetch(`${API_HOST}/api/reports`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify(params),
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`Submit report failed (${res.status}): ${text || res.statusText}`)
+  }
+  return (await res.json()) as { report_id: string; stats: ReportStats }
+}
 
-      const warningFromJson = extractWarning(json)
+export async function fetchReports(prediction_id: string): Promise<{ prediction_id: string; stats: ReportStats; reports: ReportItem[] }>{
+  const res = await fetch(`${API_HOST}/api/reports/${encodeURIComponent(prediction_id)}`, {
+    method: 'GET',
+    headers: { 'Accept': 'application/json' },
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`Fetch reports failed (${res.status}): ${text || res.statusText}`)
+  }
+  return (await res.json()) as { prediction_id: string; stats: ReportStats; reports: ReportItem[] }
+}
 
-      // Non-OK -> return warning with best-available message
-      if (!res.ok) {
-        if (warningFromJson) {
-          return { ok: false, warning: warningFromJson }
-        }
-        const fallback = text || res.statusText || 'Request failed'
-        return { ok: false, warning: fallback }
-      }
+// New: resolve latest prediction by address so we can always enable reporting even when prediction_id is missing in analysis response
+export type DbPrediction = { id: string; address: string; confidence: number; is_fraud: boolean }
 
-      // OK with a warning payload
-      if (warningFromJson) {
-        return { ok: false, warning: warningFromJson }
-      }
-
-      // Otherwise, treat as a normal backend response
-      const data = (json ?? { fraudulent_transactions: [] as BackendTransaction[], confidence: 0, is_fraud: false, addresses_involved: [] as string[], num_transactions: 0 }) as BackendResponse
-      return { ok: true, data }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Network error'
-      return { ok: false, warning: msg }
-    }
+export async function fetchPredictionByAddress(address: string): Promise<DbPrediction> {
+  const res = await fetch(`${API_HOST}/api/predictions/${encodeURIComponent(address)}`, {
+    method: 'GET',
+    headers: { 'Accept': 'application/json' },
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`Fetch prediction by address failed (${res.status}): ${text || res.statusText}`)
+  }
+  return (await res.json()) as DbPrediction
 }

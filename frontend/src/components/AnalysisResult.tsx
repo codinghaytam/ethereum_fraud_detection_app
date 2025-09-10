@@ -6,6 +6,9 @@ import { Badge } from './ui/badge'
 import { toast } from 'sonner'
 import type { AnalysisData } from '../App'
 import { ExternalLink } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { fetchReports, submitReport, type ReportStats, fetchPredictionByAddress } from '../lib/api'
+import { getOrCreateUserId } from '../lib/utils'
 
 interface AnalysisResultProps {
   data: AnalysisData
@@ -16,6 +19,7 @@ const RESULT_CONFIG = {
   title: 'Analysis Result',
   labels: {
     address: 'Address',
+    fraudProbability: 'Fraud Probability',
     confidence: 'Confidence'
   },
   riskColors: {
@@ -31,15 +35,82 @@ const RESULT_CONFIG = {
 }
 
 export function AnalysisResult({ data }: AnalysisResultProps) {
-  const { address, confidence, riskLevel, addresses, transactions, numTransactions } = data
-  // When backend returns a warning (e.g., Etherscan 404 no transactions), prefer showing it over predictions
-  const warning: string | undefined = (data as unknown as { warning?: string })?.warning
-  
+  const { address, fraudProbability, riskLevel, addresses, transactions, predictionId } = data
+  const [note, setNote] = useState('')
+  const [stats, setStats] = useState<ReportStats | null>(null)
+  const [loadingStats, setLoadingStats] = useState(false)
+  const [submitting, setSubmitting] = useState<'valid' | 'invalid' | null>(null)
+  const userId = useMemo(() => getOrCreateUserId(), [])
+
+  // New: resolve prediction id by address if missing, so reporting is always available
+  const [resolvedPredictionId, setResolvedPredictionId] = useState<string | undefined>(predictionId)
+  const [attemptedAnalysisFallback, setAttemptedAnalysisFallback] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    async function resolveId() {
+      try {
+        if (predictionId) {
+          if (!active) return
+          setResolvedPredictionId(predictionId)
+          return
+        }
+        if (!address) return
+        // Try to resolve from DB by address first
+        const pred = await fetchPredictionByAddress(address)
+        if (!active) return
+        if (pred?.id) {
+          setResolvedPredictionId(pred.id)
+          return
+        }
+      } catch {
+        // ignore and try fallback below
+      }
+      // Fallback: trigger a fresh analysis once to ensure we get a prediction_id
+      try {
+        if (!attemptedAnalysisFallback && address) {
+          setAttemptedAnalysisFallback(true)
+          const { fetchAnalysis } = await import('../lib/api')
+          const fresh = await fetchAnalysis(address)
+          if (!active) return
+          if (fresh?.prediction_id) {
+            setResolvedPredictionId(fresh.prediction_id)
+          }
+        }
+      } catch {
+        // swallow; UI remains without reporting if backend unavailable
+      }
+    }
+    resolveId()
+    return () => { active = false }
+  }, [predictionId, address, attemptedAnalysisFallback])
+
+  useEffect(() => {
+    let active = true
+    async function load() {
+      if (!resolvedPredictionId) return
+      try {
+        setLoadingStats(true)
+        const res = await fetchReports(resolvedPredictionId)
+        if (!active) return
+        setStats(res.stats)
+      } catch {
+        // Silent; UI works without stats
+      } finally {
+        if (active) setLoadingStats(false)
+      }
+    }
+    load()
+    return () => {
+      active = false
+    }
+  }, [resolvedPredictionId])
+
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text)
       toast.success('Address copied to clipboard')
-  } catch {
+    } catch {
       toast.error('Failed to copy address')
     }
   }
@@ -50,40 +121,26 @@ export function AnalysisResult({ data }: AnalysisResultProps) {
 
   const RiskIcon = RESULT_CONFIG.riskIcons[riskLevel]
   const riskColor = RESULT_CONFIG.riskColors[riskLevel]
-  const safeAddresses = Array.isArray(addresses) ? addresses : []
-  const safeTransactions = Array.isArray(transactions) ? transactions : []
-  const safeNumTransactions = typeof numTransactions === 'number' ? numTransactions : safeTransactions.length
-  // Show a yellow warning card instead of predictions if present
-  if (warning) {
-    const WarningIcon = AlertTriangle
-    return (
-      <Card className="overflow-hidden border-white/10 bg-card/60  dark:bg-yellow-950/20 backdrop-blur-xl">
-        <CardHeader className="text-center">
-          <CardTitle>{RESULT_CONFIG.title}</CardTitle>
-          <CardDescription>
-            <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-800 dark:text-yellow-300 border-yellow-500/30">
-              <WarningIcon className="mr-1 h-3 w-3" />
-              Warning
-            </Badge>
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">{RESULT_CONFIG.labels.address}</label>
-            <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
-              <code className="flex-1 text-sm font-mono">{`${address.slice(0, 6)}...${address.slice(-4)}`}</code>
-              <Button variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(address)}>
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-          <div className="rounded-md border border-yellow-500/30 bg-yellow-100/60 dark:bg-yellow-900/30 p-4 text-sm text-yellow-900 dark:text-yellow-200 flex items-start gap-2">
-            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-            <p>{warning}</p>
-          </div>
-        </CardContent>
-      </Card>
-    )
+
+  const canReport = Boolean(resolvedPredictionId)
+
+  async function handleReport(is_valid: boolean) {
+    if (!resolvedPredictionId) {
+      toast.error('Prediction ID missing; cannot submit report')
+      return
+    }
+    try {
+      setSubmitting(is_valid ? 'valid' : 'invalid')
+      const res = await submitReport({ prediction_id: resolvedPredictionId, user_id: userId, is_valid, note: note || undefined })
+      setStats(res.stats)
+      toast.success('Thanks for your feedback')
+      setNote('')
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to submit report'
+      toast.error(msg)
+    } finally {
+      setSubmitting(null)
+    }
   }
 
   return (
@@ -119,31 +176,23 @@ export function AnalysisResult({ data }: AnalysisResultProps) {
         {/* Confidence */}
         <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300 delay-200">
           <div className="flex justify-between items-center">
-            <label className="text-sm font-medium">fraud Probability</label>
-            <span className="text-sm font-medium">{confidence}%</span>
+            <label className="text-sm font-medium">Fraud Probability</label>
+            <span className="text-sm font-medium">{fraudProbability}%</span>
           </div>
           <div className="relative">
-            <Progress value={confidence} className="h-2" />
-            <div 
+            <Progress value={fraudProbability} className="h-2" />
+            <div
               className={`absolute top-0 left-0 h-2 rounded-full ${riskColor}`}
-              style={{ width: `${confidence}%`, transition: 'width 500ms ease' }}
+              style={{ width: `${fraudProbability}%`, transition: 'width 500ms ease' }}
             />
           </div>
         </div>
 
-        {/* Transactions count */}
-        <div className="space-y-1 animate-in fade-in slide-in-from-left-2 duration-300 delay-250">
-          <div className="flex justify-between items-center">
-            <label className="text-sm font-medium">Transactions Analyzed</label>
-            <span className="text-sm font-medium">{safeNumTransactions}</span>
-          </div>
-        </div>
-
-    {/* Addresses involved */}
+        {/* Addresses involved */}
         <div className="space-y-3 animate-in fade-in duration-300 delay-200">
           <label className="text-sm font-medium">Addresses Mentioned</label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      {safeAddresses.map((addr) => (
+            {addresses.map((addr) => (
               <a
                 key={addr}
                 href={`https://etherscan.io/address/${addr}`}
@@ -159,11 +208,11 @@ export function AnalysisResult({ data }: AnalysisResultProps) {
         </div>
 
         {/* Transactions */}
-    {safeTransactions.length ? (
+        {transactions?.length ? (
           <div className="space-y-3 animate-in fade-in duration-300 delay-200">
             <label className="text-sm font-medium">Flagged Transactions</label>
             <div className="space-y-2">
-      {safeTransactions.map((tx) => (
+              {transactions.map((tx) => (
                 <div key={tx.transaction_hash} className="rounded-lg border border-white/10 bg-background/50 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
@@ -190,6 +239,43 @@ export function AnalysisResult({ data }: AnalysisResultProps) {
           </div>
         ) : null}
 
+        {/* Reporting section */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium">Community validation</label>
+            {stats ? (
+              <div className="text-xs text-muted-foreground">
+                <span className="mr-3">Valid: <span className="font-medium text-green-500">{stats.valid_count}</span></span>
+                <span>Invalid: <span className="font-medium text-red-500">{stats.invalid_count}</span></span>
+              </div>
+            ) : (
+              <div className="text-xs text-muted-foreground">{loadingStats ? 'Loading…' : 'No feedback yet'}</div>
+            )}
+          </div>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.currentTarget.value)}
+            placeholder={canReport ? 'Optional: share why you think this is valid or not' : 'Run an analysis to enable reporting'}
+            disabled={!canReport}
+            className="w-full min-h-20 rounded-md border border-white/10 bg-background/50 p-2 text-sm outline-none disabled:opacity-60"
+          />
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              disabled={!canReport || submitting !== null}
+              onClick={() => handleReport(true)}
+            >
+              {submitting === 'valid' ? 'Submitting…' : 'Mark Valid'}
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={!canReport || submitting !== null}
+              onClick={() => handleReport(false)}
+            >
+              {submitting === 'invalid' ? 'Submitting…' : 'Mark Invalid'}
+            </Button>
+          </div>
+        </div>
         {/* Risk Level Indicator */}
         <div className="flex items-center justify-center p-4 border rounded-lg animate-in fade-in zoom-in-95 duration-300 delay-300">
           <div className="text-center">
